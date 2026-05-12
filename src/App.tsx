@@ -1,0 +1,736 @@
+import { AnimatePresence, motion } from 'framer-motion';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis
+} from 'recharts';
+
+type EntryType = 'pushups' | 'pullups' | 'plank' | 'handstand';
+type Tab = 'today' | 'trends' | 'settings';
+
+type Entry = {
+  id: string;
+  date: string;
+  type: EntryType;
+  amount: number;
+  createdAt: number;
+};
+
+type ExerciseMeta = {
+  label: string;
+  short: string;
+  unit: string;
+  defaultValue: number;
+  best: number;
+  color: string;
+  glow: string;
+  kind: 'count' | 'time';
+};
+
+const databaseName = 'workout-tracker-h5';
+const databaseVersion = 1;
+const entryStoreName = 'workout_entries';
+
+const exerciseMeta: Record<EntryType, ExerciseMeta> = {
+  pushups: {
+    label: '俯卧撑',
+    short: '俯',
+    unit: '次',
+    defaultValue: 20,
+    best: 240,
+    color: '#4f7cff',
+    glow: 'shadow-blue-500/20',
+    kind: 'count'
+  },
+  pullups: {
+    label: '引体向上',
+    short: '引',
+    unit: '次',
+    defaultValue: 6,
+    best: 81,
+    color: '#45d67b',
+    glow: 'shadow-emerald-500/20',
+    kind: 'count'
+  },
+  plank: {
+    label: '平板支撑',
+    short: '撑',
+    unit: '分钟',
+    defaultValue: 90,
+    best: 750,
+    color: '#b85cff',
+    glow: 'shadow-purple-500/20',
+    kind: 'time'
+  },
+  handstand: {
+    label: '倒立',
+    short: '倒',
+    unit: '分钟',
+    defaultValue: 45,
+    best: 500,
+    color: '#ff9f2f',
+    glow: 'shadow-amber-500/20',
+    kind: 'time'
+  }
+};
+
+const order: EntryType[] = ['pushups', 'pullups', 'plank', 'handstand'];
+const quickSteps: Record<EntryType, number[]> = {
+  pushups: [10, 20, 30],
+  pullups: [3, 5, 8],
+  plank: [30, 60, 90],
+  handstand: [20, 45, 60]
+};
+
+const pad = (value: number) => String(value).padStart(2, '0');
+
+const dateKey = (date: Date) =>
+  `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+
+const todayKey = () => dateKey(new Date());
+
+const formatDuration = (seconds: number) => {
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+  return `${pad(minutes)}:${pad(rest)}`;
+};
+
+const formatAmount = (type: EntryType, amount: number) => {
+  const meta = exerciseMeta[type];
+  return meta.kind === 'time' ? formatDuration(amount) : amount.toLocaleString('zh-CN');
+};
+
+const formatUnit = (type: EntryType) => (exerciseMeta[type].kind === 'time' ? '分钟' : exerciseMeta[type].unit);
+
+const requestToPromise = <T,>(request: IDBRequest<T>) =>
+  new Promise<T>((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+
+const openWorkoutDatabase = () =>
+  new Promise<IDBDatabase>((resolve, reject) => {
+    const request = indexedDB.open(databaseName, databaseVersion);
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(entryStoreName)) {
+        const store = db.createObjectStore(entryStoreName, { keyPath: 'id' });
+        store.createIndex('date', 'date', { unique: false });
+        store.createIndex('createdAt', 'createdAt', { unique: false });
+        store.createIndex('type', 'type', { unique: false });
+      }
+    };
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+
+const readEntriesFromDatabase = async () => {
+  const db = await openWorkoutDatabase();
+  try {
+    const transaction = db.transaction(entryStoreName, 'readonly');
+    const store = transaction.objectStore(entryStoreName);
+    return await requestToPromise<Entry[]>(store.getAll());
+  } finally {
+    db.close();
+  }
+};
+
+const saveEntryToDatabase = async (entry: Entry) => {
+  const db = await openWorkoutDatabase();
+  try {
+    const transaction = db.transaction(entryStoreName, 'readwrite');
+    const store = transaction.objectStore(entryStoreName);
+    await requestToPromise(store.put(entry));
+  } finally {
+    db.close();
+  }
+};
+
+const deleteEntryFromDatabase = async (id: string) => {
+  const db = await openWorkoutDatabase();
+  try {
+    const transaction = db.transaction(entryStoreName, 'readwrite');
+    const store = transaction.objectStore(entryStoreName);
+    await requestToPromise(store.delete(id));
+  } finally {
+    db.close();
+  }
+};
+
+const clearEntriesFromDatabase = async () => {
+  const db = await openWorkoutDatabase();
+  try {
+    const transaction = db.transaction(entryStoreName, 'readwrite');
+    const store = transaction.objectStore(entryStoreName);
+    await requestToPromise(store.clear());
+  } finally {
+    db.close();
+  }
+};
+
+function App() {
+  const [entries, setEntries] = useState<Entry[]>([]);
+  const [activeTab, setActiveTab] = useState<Tab>('today');
+  const [toast, setToast] = useState<{ text: string; id: string } | null>(null);
+  const [detailType, setDetailType] = useState<EntryType | null>(null);
+  const [customType, setCustomType] = useState<EntryType | null>(null);
+  const [customValue, setCustomValue] = useState('');
+  const [timerType, setTimerType] = useState<EntryType>('plank');
+  const [timerSeconds, setTimerSeconds] = useState(0);
+  const [timerRunning, setTimerRunning] = useState(false);
+  const pressTimer = useRef<number | null>(null);
+  const longPressFired = useRef(false);
+  const toastTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    let ignore = false;
+
+    readEntriesFromDatabase()
+      .then((storedEntries) => {
+        if (!ignore) {
+          setEntries(storedEntries);
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to read workout database', error);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!timerRunning) return undefined;
+    const interval = window.setInterval(() => {
+      setTimerSeconds((value) => value + 1);
+    }, 1000);
+    return () => window.clearInterval(interval);
+  }, [timerRunning]);
+
+  const today = todayKey();
+  const todayEntries = useMemo(() => entries.filter((entry) => entry.date === today), [entries, today]);
+
+  const summary = useMemo(
+    () =>
+      todayEntries.reduce<Record<EntryType, number>>(
+        (acc, entry) => {
+          acc[entry.type] += entry.amount;
+          return acc;
+        },
+        { pushups: 0, pullups: 0, plank: 0, handstand: 0 }
+      ),
+    [todayEntries]
+  );
+
+  const logs = useMemo(() => [...entries].sort((a, b) => b.createdAt - a.createdAt), [entries]);
+
+  const trendData = useMemo(() => {
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = new Date();
+      date.setDate(date.getDate() - (6 - index));
+      const key = dateKey(date);
+      const dayEntries = entries.filter((entry) => entry.date === key);
+      return {
+        date: `${date.getMonth() + 1}/${date.getDate()}`,
+        count: dayEntries
+          .filter((entry) => exerciseMeta[entry.type].kind === 'count')
+          .reduce((total, entry) => total + entry.amount, 0),
+        time: Math.round(
+          dayEntries
+            .filter((entry) => exerciseMeta[entry.type].kind === 'time')
+            .reduce((total, entry) => total + entry.amount, 0) / 60
+        )
+      };
+    });
+  }, [entries]);
+
+  const totalMinutes = Math.round((summary.plank + summary.handstand) / 60);
+  const totalReps = summary.pushups + summary.pullups;
+
+  function showUndoToast(entry: Entry) {
+    window.clearTimeout(toastTimer.current ?? undefined);
+    setToast({
+      id: entry.id,
+      text: `${exerciseMeta[entry.type].label} +${formatAmount(entry.type, entry.amount)} ${formatUnit(entry.type)}`
+    });
+    toastTimer.current = window.setTimeout(() => setToast(null), 3600);
+  }
+
+  async function addRecord(type: EntryType, amount: number) {
+    const entry = { id: `${Date.now()}-${type}`, date: today, type, amount, createdAt: Date.now() };
+    await saveEntryToDatabase(entry);
+    setEntries((current) => [entry, ...current]);
+    showUndoToast(entry);
+  }
+
+  async function undoRecord(id: string) {
+    await deleteEntryFromDatabase(id);
+    setEntries((current) => current.filter((entry) => entry.id !== id));
+    setToast(null);
+  }
+
+  async function deleteRecord(id: string) {
+    await deleteEntryFromDatabase(id);
+    setEntries((current) => current.filter((entry) => entry.id !== id));
+    setToast(null);
+  }
+
+  async function clearAllRecords() {
+    const confirmed = window.confirm('确定清空这台设备上的所有训练数据吗？此操作不可撤销。');
+    if (!confirmed) return;
+    await clearEntriesFromDatabase();
+    setEntries([]);
+    setToast(null);
+  }
+
+  function startLongPress(type: EntryType) {
+    longPressFired.current = false;
+    window.clearTimeout(pressTimer.current ?? undefined);
+    pressTimer.current = window.setTimeout(() => {
+      longPressFired.current = true;
+      setCustomType(type);
+      setCustomValue(
+        exerciseMeta[type].kind === 'time'
+          ? String(exerciseMeta[type].defaultValue / 60)
+          : String(exerciseMeta[type].defaultValue)
+      );
+    }, 520);
+  }
+
+  function endLongPress(type: EntryType) {
+    window.clearTimeout(pressTimer.current ?? undefined);
+    if (!longPressFired.current) {
+      addRecord(type, exerciseMeta[type].defaultValue);
+    }
+  }
+
+  function endQuickStep(type: EntryType, amount: number) {
+    window.clearTimeout(pressTimer.current ?? undefined);
+    if (!longPressFired.current) {
+      addRecord(type, amount);
+    }
+  }
+
+  function saveTimer() {
+    if (timerSeconds < 1) return;
+    addRecord(timerType, timerSeconds);
+    setTimerSeconds(0);
+    setTimerRunning(false);
+  }
+
+  function saveCustom() {
+    if (!customType) return;
+    const parsed = Number(customValue);
+    if (!Number.isFinite(parsed) || parsed <= 0) return;
+    const amount = exerciseMeta[customType].kind === 'time' ? Math.round(parsed * 60) : Math.round(parsed);
+    addRecord(customType, amount);
+    setCustomType(null);
+  }
+
+  const renderToday = () => (
+    <>
+      <header className="px-4 pb-4 pt-6">
+        <div className="flex items-start justify-between gap-5">
+          <div>
+            <h1 className="text-[32px] font-bold leading-none tracking-normal text-white">今日训练</h1>
+            <p className="mt-3 text-sm font-medium text-zinc-500">
+              {new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' })}
+            </p>
+          </div>
+          <div className="pt-1 text-right">
+            <p className="text-xs text-zinc-500">连续训练</p>
+            <p className="mt-1 text-2xl font-bold text-orange-300">18天</p>
+          </div>
+        </div>
+      </header>
+
+      <section className="grid grid-cols-4 gap-2 px-4">
+        {order.map((type) => {
+          const meta = exerciseMeta[type];
+          return (
+            <motion.button
+              layout
+              key={type}
+              onClick={() => setDetailType(type)}
+              className={`min-h-[146px] rounded-[18px] bg-zinc-900/90 px-2.5 py-4 text-center shadow-2xl ${meta.glow}`}
+              whileTap={{ scale: 0.98 }}
+            >
+              <div
+                className="mx-auto mb-4 flex h-9 w-9 items-center justify-center rounded-2xl text-sm font-bold"
+                style={{ backgroundColor: `${meta.color}22`, color: meta.color }}
+              >
+                {meta.short}
+              </div>
+              <p className="text-xs font-semibold text-zinc-300">{meta.label}</p>
+              <p className="mt-3 text-[25px] font-bold leading-none text-white">{formatAmount(type, summary[type])}</p>
+              <p className="mt-2 text-xs text-zinc-400">{formatUnit(type)}</p>
+              <p className="mt-3 text-[11px] text-zinc-500">
+                最佳 {meta.kind === 'time' ? formatDuration(meta.best) : meta.best} {formatUnit(type)}
+              </p>
+            </motion.button>
+          );
+        })}
+      </section>
+
+      <section className="mt-6 px-4">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-lg font-bold text-white">快捷记录</h2>
+          <span className="text-xs font-medium text-zinc-500">长按自定义</span>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          {(['pushups', 'pullups'] as EntryType[]).map((type) => {
+            const meta = exerciseMeta[type];
+            return (
+              <div
+                key={type}
+                className="rounded-[16px] border border-white/5 bg-zinc-900/80 p-4 shadow-xl shadow-black/20"
+                style={{ boxShadow: `inset 0 0 28px ${meta.color}10` }}
+              >
+                <p className="font-semibold" style={{ color: meta.color }}>
+                  {meta.label}
+                </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {quickSteps[type].map((step) => (
+                    <motion.button
+                      key={step}
+                      whileTap={{ scale: 0.94 }}
+                      onPointerDown={() => startLongPress(type)}
+                      onPointerUp={() => endQuickStep(type, step)}
+                      onPointerCancel={() => window.clearTimeout(pressTimer.current ?? undefined)}
+                      onContextMenu={(event) => event.preventDefault()}
+                      className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-white"
+                    >
+                      +{meta.kind === 'time' ? formatDuration(step) : step}
+                    </motion.button>
+                  ))}
+                  <motion.button
+                    whileTap={{ scale: 0.94 }}
+                    onPointerDown={() => startLongPress(type)}
+                    onPointerUp={() => endLongPress(type)}
+                    onPointerCancel={() => window.clearTimeout(pressTimer.current ?? undefined)}
+                    onContextMenu={(event) => event.preventDefault()}
+                    className="rounded-2xl border px-3 py-2 text-sm font-semibold"
+                    style={{ borderColor: `${meta.color}70`, color: meta.color }}
+                  >
+                    默认
+                  </motion.button>
+                </div>
+              </div>
+            );
+          })}
+          {(['plank', 'handstand'] as EntryType[]).map((type) => {
+            const meta = exerciseMeta[type];
+            const isActiveTimer = timerType === type;
+            return (
+              <div
+                key={type}
+                className="rounded-[16px] border border-white/5 bg-zinc-900/80 p-4 shadow-xl shadow-black/20"
+                style={{ boxShadow: `inset 0 0 30px ${meta.color}18` }}
+              >
+                <p className="font-semibold" style={{ color: meta.color }}>
+                  {meta.label}
+                </p>
+                <div className="mt-4 grid grid-cols-[1fr_auto] gap-2">
+                  <motion.button
+                    whileTap={{ scale: 0.96 }}
+                    onClick={() => {
+                      if (!isActiveTimer) {
+                        setTimerType(type);
+                        setTimerSeconds(0);
+                        setTimerRunning(true);
+                        return;
+                      }
+                      setTimerRunning((value) => !value);
+                    }}
+                    className="h-11 rounded-2xl border px-3 text-left text-sm font-bold"
+                    style={{ borderColor: `${meta.color}90`, color: meta.color }}
+                  >
+                    {isActiveTimer && timerSeconds > 0 ? formatDuration(timerSeconds) : '开始计时'}
+                  </motion.button>
+                  <button
+                    onClick={() => {
+                      if (!isActiveTimer) {
+                        setTimerType(type);
+                        setTimerSeconds(0);
+                        return;
+                      }
+                      saveTimer();
+                    }}
+                    className="h-11 w-11 rounded-2xl border text-xs font-bold"
+                    style={{ borderColor: `${meta.color}90`, color: meta.color }}
+                  >
+                    保存
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="mt-4 px-4 pb-28">
+        <div className="rounded-[30px] border border-white/10 bg-zinc-950/70 p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-bold text-white">最近记录</h2>
+            <span className="text-sm text-zinc-500">{logs.length} 条</span>
+          </div>
+          <div className="space-y-1">
+            {logs.length === 0 ? (
+              <div className="rounded-2xl px-2 py-6 text-center text-sm font-medium text-zinc-600">暂无记录</div>
+            ) : null}
+            {logs.slice(0, 6).map((entry) => (
+              <div
+                key={entry.id}
+                className="flex w-full items-center justify-between gap-3 rounded-2xl px-2 py-3 text-left"
+              >
+                <button onClick={() => setDetailType(entry.type)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                  <span
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-xs font-bold"
+                    style={{
+                      backgroundColor: `${exerciseMeta[entry.type].color}22`,
+                      color: exerciseMeta[entry.type].color
+                    }}
+                  >
+                    {exerciseMeta[entry.type].short}
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold text-white">{exerciseMeta[entry.type].label}</p>
+                    <p className="text-xs text-zinc-500">
+                      {new Date(entry.createdAt).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })}{' '}
+                      {new Date(entry.createdAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                </button>
+                <div className="flex shrink-0 items-center gap-2">
+                  <p className="text-base font-bold text-white">
+                    +{formatAmount(entry.type, entry.amount)} {formatUnit(entry.type)}
+                  </p>
+                  <button
+                    onClick={() => deleteRecord(entry.id)}
+                    className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-zinc-400"
+                  >
+                    删除
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    </>
+  );
+
+  const renderTrends = () => (
+    <div className="px-5 pb-28 pt-7">
+      <h1 className="text-center text-xl font-bold text-white">趋势</h1>
+      <div className="mt-6 grid grid-cols-2 gap-3">
+        <div className="rounded-[26px] bg-zinc-900 p-4">
+          <p className="text-sm text-zinc-500">今日次数</p>
+          <p className="mt-3 text-4xl font-bold text-white">{totalReps}</p>
+        </div>
+        <div className="rounded-[26px] bg-zinc-900 p-4">
+          <p className="text-sm text-zinc-500">计时分钟</p>
+          <p className="mt-3 text-4xl font-bold text-white">{totalMinutes}</p>
+        </div>
+      </div>
+      <div className="mt-4 rounded-[30px] bg-zinc-900 p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-zinc-500">最近 7 天</p>
+            <h2 className="mt-1 text-xl font-bold text-white">训练趋势</h2>
+          </div>
+          <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-zinc-400">Recharts</span>
+        </div>
+        <div className="mt-5 h-72">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={trendData} margin={{ top: 8, right: 0, left: -24, bottom: 0 }}>
+              <CartesianGrid stroke="rgba(255,255,255,0.07)" vertical={false} />
+              <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: '#71717a', fontSize: 12 }} />
+              <YAxis axisLine={false} tickLine={false} tick={{ fill: '#71717a', fontSize: 12 }} />
+              <Tooltip
+                cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                contentStyle={{ background: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 18 }}
+                labelStyle={{ color: '#fff' }}
+              />
+              <Bar dataKey="count" name="次数" fill="#4f7cff" radius={[10, 10, 10, 10]} />
+              <Bar dataKey="time" name="分钟" fill="#b85cff" radius={[10, 10, 10, 10]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderSettings = () => (
+    <div className="px-5 pb-28 pt-7">
+      <h1 className="text-center text-xl font-bold text-white">设置</h1>
+      <div className="mt-6 space-y-3">
+        {['深色模式已开启', '数据保存在本机 IndexedDB，手机访问时即存于手机本地', '长按快捷按钮可自定义数量', '保存计时后可立即撤销'].map((item) => (
+          <div key={item} className="rounded-[24px] bg-zinc-900 px-4 py-4 text-sm font-medium text-zinc-300">
+            {item}
+          </div>
+        ))}
+      </div>
+      <button
+        onClick={clearAllRecords}
+        className="mt-5 w-full rounded-full bg-white px-5 py-4 text-sm font-bold text-black"
+      >
+        一键清空所有数据
+      </button>
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-black text-white">
+      <main className="mx-auto min-h-screen max-w-md bg-[radial-gradient(circle_at_50%_-10%,rgba(80,80,80,0.34),transparent_36%),#050505]">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.22 }}
+          >
+            {activeTab === 'today' && renderToday()}
+            {activeTab === 'trends' && renderTrends()}
+            {activeTab === 'settings' && renderSettings()}
+          </motion.div>
+        </AnimatePresence>
+      </main>
+
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 24, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 24, scale: 0.98 }}
+            className="fixed inset-x-4 bottom-24 z-50 mx-auto max-w-md rounded-[22px] border border-white/10 bg-zinc-900/90 p-4 shadow-2xl shadow-black/50 backdrop-blur-xl"
+          >
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-sm font-semibold text-white">{toast.text}</p>
+              <button onClick={() => undoRecord(toast.id)} className="rounded-full bg-white px-4 py-2 text-xs font-bold text-black">
+                撤销
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {(detailType || customType) && (
+          <motion.div
+            className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => {
+              setDetailType(null);
+              setCustomType(null);
+            }}
+          >
+            <motion.div
+              className="absolute bottom-0 left-0 right-0 mx-auto max-w-md rounded-t-[34px] border border-white/10 bg-zinc-950 px-5 pb-8 pt-4 shadow-2xl"
+              initial={{ y: 360 }}
+              animate={{ y: 0 }}
+              exit={{ y: 360 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 32 }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="mx-auto mb-5 h-1 w-12 rounded-full bg-white/20" />
+              {customType ? (
+                <>
+                  <p className="text-sm text-zinc-500">自定义记录</p>
+                  <h2 className="mt-1 text-2xl font-bold text-white">{exerciseMeta[customType].label}</h2>
+                  <label className="mt-5 block text-sm text-zinc-500">
+                    {exerciseMeta[customType].kind === 'time' ? '分钟' : '次数'}
+                  </label>
+                  <input
+                    autoFocus
+                    value={customValue}
+                    onChange={(event) => setCustomValue(event.target.value)}
+                    inputMode="decimal"
+                    className="mt-2 w-full rounded-[24px] border border-white/10 bg-white/[0.06] px-4 py-4 text-3xl font-bold text-white outline-none"
+                  />
+                  <button onClick={saveCustom} className="mt-5 w-full rounded-full bg-white py-4 text-sm font-bold text-black">
+                    保存记录
+                  </button>
+                </>
+              ) : detailType ? (
+                <>
+                  <p className="text-sm text-zinc-500">训练详情</p>
+                  <div className="mt-1 flex items-center justify-between">
+                    <h2 className="text-2xl font-bold text-white">{exerciseMeta[detailType].label}</h2>
+                    <span
+                      className="rounded-full px-3 py-1 text-xs font-bold"
+                      style={{
+                        backgroundColor: `${exerciseMeta[detailType].color}22`,
+                        color: exerciseMeta[detailType].color
+                      }}
+                    >
+                      {exerciseMeta[detailType].kind === 'time' ? '计时' : '次数'}
+                    </span>
+                  </div>
+                  <div className="mt-5 grid grid-cols-2 gap-3">
+                    <div className="rounded-[24px] bg-white/[0.06] p-4">
+                      <p className="text-xs text-zinc-500">今日</p>
+                      <p className="mt-2 text-3xl font-bold text-white">{formatAmount(detailType, summary[detailType])}</p>
+                    </div>
+                    <div className="rounded-[24px] bg-white/[0.06] p-4">
+                      <p className="text-xs text-zinc-500">最佳</p>
+                      <p className="mt-2 text-3xl font-bold text-white">
+                        {exerciseMeta[detailType].kind === 'time'
+                          ? formatDuration(exerciseMeta[detailType].best)
+                          : exerciseMeta[detailType].best}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      addRecord(detailType, exerciseMeta[detailType].defaultValue);
+                      setDetailType(null);
+                    }}
+                    className="mt-5 w-full rounded-full py-4 text-sm font-bold text-white"
+                    style={{ backgroundColor: exerciseMeta[detailType].color }}
+                  >
+                    + 记录默认值
+                  </button>
+                </>
+              ) : null}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-black/80 backdrop-blur-2xl">
+        <div className="mx-auto flex max-w-md items-center justify-around px-6 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-3">
+          {[
+            { key: 'today' as Tab, label: 'Today', mark: '●' },
+            { key: 'trends' as Tab, label: 'Trends', mark: '⌁' },
+            { key: 'settings' as Tab, label: 'Settings', mark: '○' }
+          ].map((item) => (
+            <button
+              key={item.key}
+              onClick={() => setActiveTab(item.key)}
+              className={`flex min-w-20 flex-col items-center gap-1 text-xs font-semibold ${
+                activeTab === item.key ? 'text-blue-400' : 'text-zinc-600'
+              }`}
+            >
+              <span className="text-lg leading-none">{item.mark}</span>
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </nav>
+    </div>
+  );
+}
+
+export default App;
