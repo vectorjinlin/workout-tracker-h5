@@ -12,6 +12,10 @@ import {
 
 type EntryType = 'pushups' | 'pullups' | 'plank' | 'handstand';
 type Tab = 'today' | 'trends' | 'settings';
+type QuickTarget = {
+  index: number;
+  type: Extract<EntryType, 'pushups' | 'pullups'>;
+};
 
 type Entry = {
   id: string;
@@ -23,7 +27,6 @@ type Entry = {
 
 type ExerciseMeta = {
   label: string;
-  short: string;
   unit: string;
   defaultValue: number;
   best: number;
@@ -35,11 +38,11 @@ type ExerciseMeta = {
 const databaseName = 'workout-tracker-h5';
 const databaseVersion = 1;
 const entryStoreName = 'workout_entries';
+const quickAmountsStorageKey = 'workout-tracker-h5-quick-amounts';
 
 const exerciseMeta: Record<EntryType, ExerciseMeta> = {
   pushups: {
     label: '俯卧撑',
-    short: '俯',
     unit: '次',
     defaultValue: 20,
     best: 240,
@@ -49,7 +52,6 @@ const exerciseMeta: Record<EntryType, ExerciseMeta> = {
   },
   pullups: {
     label: '引体向上',
-    short: '引',
     unit: '次',
     defaultValue: 6,
     best: 81,
@@ -59,7 +61,6 @@ const exerciseMeta: Record<EntryType, ExerciseMeta> = {
   },
   plank: {
     label: '平板支撑',
-    short: '撑',
     unit: '分钟',
     defaultValue: 90,
     best: 750,
@@ -69,7 +70,6 @@ const exerciseMeta: Record<EntryType, ExerciseMeta> = {
   },
   handstand: {
     label: '倒立',
-    short: '倒',
     unit: '分钟',
     defaultValue: 45,
     best: 500,
@@ -80,11 +80,10 @@ const exerciseMeta: Record<EntryType, ExerciseMeta> = {
 };
 
 const order: EntryType[] = ['pushups', 'pullups', 'plank', 'handstand'];
-const quickSteps: Record<EntryType, number[]> = {
-  pushups: [10, 20, 30],
-  pullups: [3, 5, 8],
-  plank: [30, 60, 90],
-  handstand: [20, 45, 60]
+const countTypes: QuickTarget['type'][] = ['pushups', 'pullups'];
+const defaultQuickAmounts: Record<QuickTarget['type'], number[]> = {
+  pushups: [10, 20],
+  pullups: [3, 5]
 };
 
 const pad = (value: number) => String(value).padStart(2, '0');
@@ -106,6 +105,76 @@ const formatAmount = (type: EntryType, amount: number) => {
 };
 
 const formatUnit = (type: EntryType) => (exerciseMeta[type].kind === 'time' ? '分钟' : exerciseMeta[type].unit);
+
+const getAmountTextClass = (type: EntryType, amount: number) => {
+  const text = formatAmount(type, amount);
+  if (type === 'plank' || type === 'handstand') {
+    return text.length > 5 ? 'text-[21px]' : 'text-[24px]';
+  }
+  return text.length > 3 ? 'text-[21px]' : 'text-[25px]';
+};
+
+const loadQuickAmounts = () => {
+  try {
+    const raw = localStorage.getItem(quickAmountsStorageKey);
+    if (!raw) return defaultQuickAmounts;
+    const parsed = JSON.parse(raw) as Partial<Record<QuickTarget['type'], number[]>>;
+    return {
+      pushups: parsed.pushups?.slice(0, 2).map(Number).filter(Number.isFinite) ?? defaultQuickAmounts.pushups,
+      pullups: parsed.pullups?.slice(0, 2).map(Number).filter(Number.isFinite) ?? defaultQuickAmounts.pullups
+    };
+  } catch {
+    return defaultQuickAmounts;
+  }
+};
+
+const ExerciseIcon = ({ type }: { type: EntryType }) => {
+  const color = exerciseMeta[type].color;
+
+  if (type === 'pushups') {
+    return (
+      <svg viewBox="0 0 48 48" className="h-8 w-8" fill="none" aria-hidden="true">
+        <circle cx="37" cy="13" r="4" fill={color} />
+        <path d="M8 31.5L18.5 26L28.5 26.5L36 18.5" stroke={color} strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M17 26L22.5 36" stroke={color} strokeWidth="5" strokeLinecap="round" />
+        <path d="M29 27L37.5 34" stroke={color} strokeWidth="5" strokeLinecap="round" />
+      </svg>
+    );
+  }
+
+  if (type === 'pullups') {
+    return (
+      <svg viewBox="0 0 48 48" className="h-8 w-8" fill="none" aria-hidden="true">
+        <path d="M9 9H39M14 9V16M34 9V16" stroke={color} strokeWidth="4" strokeLinecap="round" />
+        <path d="M16 19L24 16L32 19" stroke={color} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M24 17V36" stroke={color} strokeWidth="4" strokeLinecap="round" />
+        <path d="M19 27L14 37M29 27L34 37" stroke={color} strokeWidth="4" strokeLinecap="round" />
+      </svg>
+    );
+  }
+
+  if (type === 'plank') {
+    return (
+      <svg viewBox="0 0 48 48" className="h-8 w-8" fill="none" aria-hidden="true">
+        <circle cx="15" cy="25" r="4" fill={color} />
+        <path d="M19 25H32L39 29" stroke={color} strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M28 25L23 35" stroke={color} strokeWidth="5" strokeLinecap="round" />
+        <path d="M38 29L42 35" stroke={color} strokeWidth="5" strokeLinecap="round" />
+        <path d="M8 37H40" stroke={color} strokeWidth="3" strokeLinecap="round" opacity="0.45" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 48 48" className="h-8 w-8" fill="none" aria-hidden="true">
+      <circle cx="24" cy="10" r="4" fill={color} />
+      <path d="M24 15V29" stroke={color} strokeWidth="5" strokeLinecap="round" />
+      <path d="M14 20L24 27L34 20" stroke={color} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M19 31L13 41M29 31L35 41" stroke={color} strokeWidth="4" strokeLinecap="round" />
+      <path d="M11 42H37" stroke={color} strokeWidth="3" strokeLinecap="round" opacity="0.45" />
+    </svg>
+  );
+};
 
 const requestToPromise = <T,>(request: IDBRequest<T>) =>
   new Promise<T>((resolve, reject) => {
@@ -180,7 +249,8 @@ function App() {
   const [activeTab, setActiveTab] = useState<Tab>('today');
   const [toast, setToast] = useState<{ text: string; id: string } | null>(null);
   const [detailType, setDetailType] = useState<EntryType | null>(null);
-  const [customType, setCustomType] = useState<EntryType | null>(null);
+  const [quickTarget, setQuickTarget] = useState<QuickTarget | null>(null);
+  const [quickAmounts, setQuickAmounts] = useState(defaultQuickAmounts);
   const [customValue, setCustomValue] = useState('');
   const [timerType, setTimerType] = useState<EntryType>('plank');
   const [timerSeconds, setTimerSeconds] = useState(0);
@@ -192,6 +262,7 @@ function App() {
   useEffect(() => {
     let ignore = false;
 
+    setQuickAmounts(loadQuickAmounts());
     readEntriesFromDatabase()
       .then((storedEntries) => {
         if (!ignore) {
@@ -206,6 +277,10 @@ function App() {
       ignore = true;
     };
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem(quickAmountsStorageKey, JSON.stringify(quickAmounts));
+  }, [quickAmounts]);
 
   useEffect(() => {
     if (!timerRunning) return undefined;
@@ -291,28 +366,17 @@ function App() {
     setToast(null);
   }
 
-  function startLongPress(type: EntryType) {
+  function startLongPress(type: QuickTarget['type'], index: number) {
     longPressFired.current = false;
     window.clearTimeout(pressTimer.current ?? undefined);
     pressTimer.current = window.setTimeout(() => {
       longPressFired.current = true;
-      setCustomType(type);
-      setCustomValue(
-        exerciseMeta[type].kind === 'time'
-          ? String(exerciseMeta[type].defaultValue / 60)
-          : String(exerciseMeta[type].defaultValue)
-      );
+      setQuickTarget({ type, index });
+      setCustomValue(String(quickAmounts[type][index]));
     }, 520);
   }
 
-  function endLongPress(type: EntryType) {
-    window.clearTimeout(pressTimer.current ?? undefined);
-    if (!longPressFired.current) {
-      addRecord(type, exerciseMeta[type].defaultValue);
-    }
-  }
-
-  function endQuickStep(type: EntryType, amount: number) {
+  function endQuickStep(type: QuickTarget['type'], amount: number) {
     window.clearTimeout(pressTimer.current ?? undefined);
     if (!longPressFired.current) {
       addRecord(type, amount);
@@ -327,12 +391,20 @@ function App() {
   }
 
   function saveCustom() {
-    if (!customType) return;
-    const parsed = Number(customValue);
-    if (!Number.isFinite(parsed) || parsed <= 0) return;
-    const amount = exerciseMeta[customType].kind === 'time' ? Math.round(parsed * 60) : Math.round(parsed);
-    addRecord(customType, amount);
-    setCustomType(null);
+    if (quickTarget) {
+      const parsed = Number(customValue);
+      if (!Number.isFinite(parsed) || parsed <= 0) return;
+      const nextAmount = Math.max(1, Math.round(parsed));
+      setQuickAmounts((current) => ({
+        ...current,
+        [quickTarget.type]: current[quickTarget.type].map((amount, index) =>
+          index === quickTarget.index ? nextAmount : amount
+        )
+      }));
+      setQuickTarget(null);
+      return;
+    }
+
   }
 
   const renderToday = () => (
@@ -364,15 +436,17 @@ function App() {
               whileTap={{ scale: 0.98 }}
             >
               <div
-                className="mx-auto mb-4 flex h-9 w-9 items-center justify-center rounded-2xl text-sm font-bold"
+                className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-2xl"
                 style={{ backgroundColor: `${meta.color}22`, color: meta.color }}
               >
-                {meta.short}
+                <ExerciseIcon type={type} />
               </div>
-              <p className="text-xs font-semibold text-zinc-300">{meta.label}</p>
-              <p className="mt-3 text-[25px] font-bold leading-none text-white">{formatAmount(type, summary[type])}</p>
+              <p className="h-8 text-[12px] font-semibold leading-4 text-zinc-300">{meta.label}</p>
+              <p className={`mt-2 font-bold leading-none text-white ${getAmountTextClass(type, summary[type])}`}>
+                {formatAmount(type, summary[type])}
+              </p>
               <p className="mt-2 text-xs text-zinc-400">{formatUnit(type)}</p>
-              <p className="mt-3 text-[11px] text-zinc-500">
+              <p className="mt-3 whitespace-nowrap text-[10px] text-zinc-500">
                 最佳 {meta.kind === 'time' ? formatDuration(meta.best) : meta.best} {formatUnit(type)}
               </p>
             </motion.button>
@@ -386,7 +460,7 @@ function App() {
           <span className="text-xs font-medium text-zinc-500">长按自定义</span>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          {(['pushups', 'pullups'] as EntryType[]).map((type) => {
+          {countTypes.map((type) => {
             const meta = exerciseMeta[type];
             return (
               <div
@@ -394,34 +468,28 @@ function App() {
                 className="rounded-[16px] border border-white/5 bg-zinc-900/80 p-4 shadow-xl shadow-black/20"
                 style={{ boxShadow: `inset 0 0 28px ${meta.color}10` }}
               >
-                <p className="font-semibold" style={{ color: meta.color }}>
-                  {meta.label}
-                </p>
+                <div className="flex items-center gap-2">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-xl" style={{ backgroundColor: `${meta.color}18` }}>
+                    <ExerciseIcon type={type} />
+                  </span>
+                  <p className="min-w-0 text-sm font-semibold leading-5" style={{ color: meta.color }}>
+                    {meta.label}
+                  </p>
+                </div>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {quickSteps[type].map((step) => (
+                  {quickAmounts[type].map((step, index) => (
                     <motion.button
-                      key={step}
+                      key={`${type}-${index}`}
                       whileTap={{ scale: 0.94 }}
-                      onPointerDown={() => startLongPress(type)}
+                      onPointerDown={() => startLongPress(type, index)}
                       onPointerUp={() => endQuickStep(type, step)}
                       onPointerCancel={() => window.clearTimeout(pressTimer.current ?? undefined)}
                       onContextMenu={(event) => event.preventDefault()}
-                      className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-white"
+                      className="min-w-14 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-white"
                     >
                       +{meta.kind === 'time' ? formatDuration(step) : step}
                     </motion.button>
                   ))}
-                  <motion.button
-                    whileTap={{ scale: 0.94 }}
-                    onPointerDown={() => startLongPress(type)}
-                    onPointerUp={() => endLongPress(type)}
-                    onPointerCancel={() => window.clearTimeout(pressTimer.current ?? undefined)}
-                    onContextMenu={(event) => event.preventDefault()}
-                    className="rounded-2xl border px-3 py-2 text-sm font-semibold"
-                    style={{ borderColor: `${meta.color}70`, color: meta.color }}
-                  >
-                    默认
-                  </motion.button>
                 </div>
               </div>
             );
@@ -435,9 +503,14 @@ function App() {
                 className="rounded-[16px] border border-white/5 bg-zinc-900/80 p-4 shadow-xl shadow-black/20"
                 style={{ boxShadow: `inset 0 0 30px ${meta.color}18` }}
               >
-                <p className="font-semibold" style={{ color: meta.color }}>
-                  {meta.label}
-                </p>
+                <div className="flex items-center gap-2">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-xl" style={{ backgroundColor: `${meta.color}18` }}>
+                    <ExerciseIcon type={type} />
+                  </span>
+                  <p className="min-w-0 text-sm font-semibold leading-5" style={{ color: meta.color }}>
+                    {meta.label}
+                  </p>
+                </div>
                 <div className="mt-4 grid grid-cols-[1fr_auto] gap-2">
                   <motion.button
                     whileTap={{ scale: 0.96 }}
@@ -450,7 +523,7 @@ function App() {
                       }
                       setTimerRunning((value) => !value);
                     }}
-                    className="h-11 rounded-2xl border px-3 text-left text-sm font-bold"
+                    className="h-11 rounded-2xl border px-3 text-left text-[13px] font-bold"
                     style={{ borderColor: `${meta.color}90`, color: meta.color }}
                   >
                     {isActiveTimer && timerSeconds > 0 ? formatDuration(timerSeconds) : '开始计时'}
@@ -464,7 +537,7 @@ function App() {
                       }
                       saveTimer();
                     }}
-                    className="h-11 w-11 rounded-2xl border text-xs font-bold"
+                    className="h-11 w-11 rounded-2xl border text-[11px] font-bold"
                     style={{ borderColor: `${meta.color}90`, color: meta.color }}
                   >
                     保存
@@ -493,13 +566,13 @@ function App() {
               >
                 <button onClick={() => setDetailType(entry.type)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
                   <span
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-xs font-bold"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl"
                     style={{
                       backgroundColor: `${exerciseMeta[entry.type].color}22`,
                       color: exerciseMeta[entry.type].color
                     }}
                   >
-                    {exerciseMeta[entry.type].short}
+                    <ExerciseIcon type={entry.type} />
                   </span>
                   <div>
                     <p className="text-sm font-semibold text-white">{exerciseMeta[entry.type].label}</p>
@@ -625,7 +698,7 @@ function App() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {(detailType || customType) && (
+        {(detailType || quickTarget) && (
           <motion.div
             className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
             initial={{ opacity: 0 }}
@@ -633,7 +706,7 @@ function App() {
             exit={{ opacity: 0 }}
             onClick={() => {
               setDetailType(null);
-              setCustomType(null);
+              setQuickTarget(null);
             }}
           >
             <motion.div
@@ -645,22 +718,20 @@ function App() {
               onClick={(event) => event.stopPropagation()}
             >
               <div className="mx-auto mb-5 h-1 w-12 rounded-full bg-white/20" />
-              {customType ? (
+              {quickTarget ? (
                 <>
-                  <p className="text-sm text-zinc-500">自定义记录</p>
-                  <h2 className="mt-1 text-2xl font-bold text-white">{exerciseMeta[customType].label}</h2>
-                  <label className="mt-5 block text-sm text-zinc-500">
-                    {exerciseMeta[customType].kind === 'time' ? '分钟' : '次数'}
-                  </label>
+                  <p className="text-sm text-zinc-500">编辑快捷按钮</p>
+                  <h2 className="mt-1 text-2xl font-bold text-white">{exerciseMeta[quickTarget.type].label}</h2>
+                  <label className="mt-5 block text-sm text-zinc-500">每次增加数量</label>
                   <input
                     autoFocus
                     value={customValue}
                     onChange={(event) => setCustomValue(event.target.value)}
-                    inputMode="decimal"
+                    inputMode="numeric"
                     className="mt-2 w-full rounded-[24px] border border-white/10 bg-white/[0.06] px-4 py-4 text-3xl font-bold text-white outline-none"
                   />
                   <button onClick={saveCustom} className="mt-5 w-full rounded-full bg-white py-4 text-sm font-bold text-black">
-                    保存记录
+                    保存快捷数量
                   </button>
                 </>
               ) : detailType ? (
@@ -692,16 +763,6 @@ function App() {
                       </p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => {
-                      addRecord(detailType, exerciseMeta[detailType].defaultValue);
-                      setDetailType(null);
-                    }}
-                    className="mt-5 w-full rounded-full py-4 text-sm font-bold text-white"
-                    style={{ backgroundColor: exerciseMeta[detailType].color }}
-                  >
-                    + 记录默认值
-                  </button>
                 </>
               ) : null}
             </motion.div>
