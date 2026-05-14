@@ -43,7 +43,7 @@ const entryStoreName = 'workout_entries';
 const quickAmountsStorageKey = 'workout-tracker-h5-quick-amounts';
 const themeStorageKey = 'workout-tracker-h5-theme';
 const languageStorageKey = 'workout-tracker-h5-language';
-const appVersion = 'v0.2.6';
+const appVersion = 'v0.2.7';
 
 const text = {
   zh: {
@@ -204,9 +204,19 @@ const pad = (value: number) => String(value).padStart(2, '0');
 const randomInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
 
 const dateKey = (date: Date) =>
-  `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
 
 const todayKey = () => dateKey(new Date());
+
+const dateFromKey = (key: string) => new Date(`${key}T00:00:00.000Z`);
+
+const formatTrainingDate = (key: string, language: Language) =>
+  dateFromKey(key).toLocaleDateString(language === 'zh' ? 'zh-CN' : 'en-US', {
+    timeZone: 'UTC',
+    month: 'long',
+    day: 'numeric',
+    weekday: 'short'
+  });
 
 const formatDuration = (seconds: number) => {
   const minutes = Math.floor(seconds / 60);
@@ -498,13 +508,13 @@ const createRandomHistoryEntries = () => {
 
   Array.from({ length: days }, (_, dayIndex) => {
     const date = new Date();
-    date.setDate(date.getDate() - (days - 1 - dayIndex));
+    date.setUTCDate(date.getUTCDate() - (days - 1 - dayIndex));
     const records = randomInt(2, 6);
 
     Array.from({ length: records }, (_, recordIndex) => {
       const type = order[randomInt(0, order.length - 1)];
       const createdAt = new Date(date);
-      createdAt.setHours(randomInt(6, 22), randomInt(0, 59), randomInt(0, 59), randomInt(0, 999));
+      createdAt.setUTCHours(randomInt(0, 23), randomInt(0, 59), randomInt(0, 59), randomInt(0, 999));
 
       generated.push({
         id: `test-${now}-${dayIndex}-${recordIndex}-${type}`,
@@ -619,7 +629,7 @@ function App() {
 
     while (trainedDates.has(dateKey(cursor))) {
       streak += 1;
-      cursor.setDate(cursor.getDate() - 1);
+      cursor.setUTCDate(cursor.getUTCDate() - 1);
     }
 
     return streak;
@@ -628,11 +638,11 @@ function App() {
   const trendData = useMemo(() => {
     return Array.from({ length: trendRange }, (_, index) => {
       const date = new Date();
-      date.setDate(date.getDate() - (trendRange - 1 - index));
+      date.setUTCDate(date.getUTCDate() - (trendRange - 1 - index));
       const key = dateKey(date);
       const daySummary = dailySummaries[key] ?? { pushups: 0, pullups: 0, plank: 0, handstand: 0 };
       return {
-        date: `${date.getMonth() + 1}/${date.getDate()}`,
+        date: `${date.getUTCMonth() + 1}/${date.getUTCDate()}`,
         pushups: daySummary.pushups,
         pullups: daySummary.pullups,
         plank: Math.round(daySummary.plank / 60),
@@ -744,7 +754,7 @@ function App() {
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-600">{copy.workout as string}</p>
             <h1 className="mt-1 text-[29px] font-bold leading-none tracking-normal text-white">{copy.todayTitle as string}</h1>
             <p className="mt-2 text-[13px] font-medium leading-none text-zinc-500">
-              {new Date().toLocaleDateString(language === 'zh' ? 'zh-CN' : 'en-US', { month: 'long', day: 'numeric', weekday: 'short' })}
+              {formatTrainingDate(today, language)}
             </p>
           </div>
           <div className="shrink-0 pb-0.5 text-right">
