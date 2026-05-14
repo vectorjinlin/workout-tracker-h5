@@ -38,6 +38,7 @@ const databaseName = 'workout-tracker-h5';
 const databaseVersion = 1;
 const entryStoreName = 'workout_entries';
 const quickAmountsStorageKey = 'workout-tracker-h5-quick-amounts';
+const appVersion = 'v0.1.6';
 
 const exerciseMeta: Record<EntryType, ExerciseMeta> = {
   pushups: {
@@ -822,6 +823,7 @@ function App() {
           初始化数据
         </button>
       </div>
+      <p className="mt-6 text-center text-[11px] font-semibold text-zinc-700">版本 {appVersion}</p>
     </div>
   );
 
@@ -876,10 +878,14 @@ function App() {
             }}
           >
             <motion.div
-              className="absolute bottom-0 left-0 right-0 mx-auto max-w-md rounded-t-[34px] border border-white/10 bg-zinc-950 px-5 pb-8 pt-4 shadow-2xl"
-              initial={{ y: 360 }}
-              animate={{ y: 0 }}
-              exit={{ y: 360 }}
+              className={
+                quickTarget
+                  ? 'absolute left-4 right-4 top-[16dvh] mx-auto max-w-sm rounded-[30px] border border-white/10 bg-zinc-950 px-5 pb-[calc(env(safe-area-inset-bottom)+22px)] pt-4 shadow-2xl'
+                  : 'absolute bottom-0 left-0 right-0 mx-auto max-w-md rounded-t-[34px] border border-white/10 bg-zinc-950 px-5 pb-[calc(env(safe-area-inset-bottom)+32px)] pt-4 shadow-2xl'
+              }
+              initial={quickTarget ? { opacity: 0, y: 18, scale: 0.98 } : { y: 360 }}
+              animate={quickTarget ? { opacity: 1, y: 0, scale: 1 } : { y: 0 }}
+              exit={quickTarget ? { opacity: 0, y: 18, scale: 0.98 } : { y: 360 }}
               transition={{ type: 'spring', stiffness: 300, damping: 32 }}
               onClick={(event) => event.stopPropagation()}
             >
