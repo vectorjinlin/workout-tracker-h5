@@ -40,7 +40,7 @@ const databaseVersion = 1;
 const entryStoreName = 'workout_entries';
 const quickAmountsStorageKey = 'workout-tracker-h5-quick-amounts';
 const themeStorageKey = 'workout-tracker-h5-theme';
-const appVersion = 'v0.1.7';
+const appVersion = 'v0.1.8';
 
 const exerciseMeta: Record<EntryType, ExerciseMeta> = {
   pushups: {
@@ -551,18 +551,19 @@ function App() {
 
   const renderToday = () => (
     <>
-      <header className="px-4 pb-4 pt-3">
-        <div className="flex items-start justify-between gap-5">
-          <div>
-            <h1 className="text-[32px] font-bold leading-none tracking-normal text-white">今日训练</h1>
-            <p className="mt-3 text-sm font-medium text-zinc-500">
+      <header className="px-4 pb-4 pt-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-600">Workout</p>
+            <h1 className="mt-1 text-[31px] font-bold leading-none tracking-normal text-white">今日训练</h1>
+            <p className="mt-2 text-[13px] font-medium leading-none text-zinc-500">
               {new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' })}
             </p>
           </div>
-          <div className="pt-1 text-right">
-            <p className="text-xs text-zinc-500">训练天数</p>
-            <p className="mt-1 text-2xl font-bold text-orange-300">{trainingDays}天</p>
-            <p className="mt-1 text-[11px] font-medium text-zinc-600">连续 {streakDays} 天</p>
+          <div className="shrink-0 rounded-[22px] border border-white/10 bg-white/[0.05] px-3.5 py-3 text-right shadow-lg shadow-black/20">
+            <p className="text-[10px] font-semibold leading-none text-zinc-500">训练天数</p>
+            <p className="mt-1.5 text-[28px] font-bold leading-none text-orange-300 tabular-nums">{trainingDays}</p>
+            <p className="mt-1 text-[10px] font-semibold leading-none text-zinc-600">连续 {streakDays} 天</p>
           </div>
         </div>
       </header>
@@ -599,8 +600,8 @@ function App() {
 
       <section className="mt-6 px-4">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-white">快捷记录</h2>
-          <span className="text-xs font-medium text-zinc-500">长按自定义</span>
+          <h2 className="text-[19px] font-bold leading-none text-white">快捷记录</h2>
+          <span className="rounded-full bg-white/[0.06] px-3 py-1 text-[11px] font-semibold text-zinc-500">长按自定义</span>
         </div>
         <div className="grid grid-cols-2 gap-3">
           {countTypes.map((type) => {
@@ -608,18 +609,21 @@ function App() {
             return (
               <div
                 key={type}
-                className="rounded-[16px] border border-white/5 bg-zinc-900/80 p-4 shadow-xl shadow-black/20"
-                style={{ boxShadow: `inset 0 0 28px ${meta.color}10` }}
+                className="rounded-[22px] border border-white/5 bg-zinc-900/80 p-3.5 shadow-xl shadow-black/20"
+                style={{ boxShadow: `inset 0 0 34px ${meta.color}10` }}
               >
                 <div className="flex items-center gap-2">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-xl" style={{ backgroundColor: `${meta.color}18` }}>
+                  <span className="flex h-9 w-9 items-center justify-center rounded-[14px] [&_svg]:h-7 [&_svg]:w-7" style={{ backgroundColor: `${meta.color}18` }}>
                     <ExerciseIcon type={type} />
                   </span>
-                  <p className="min-w-0 text-sm font-semibold leading-5" style={{ color: meta.color }}>
-                    {meta.label}
-                  </p>
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] font-bold leading-none" style={{ color: meta.color }}>
+                      {meta.label}
+                    </p>
+                    <p className="mt-1 text-[10px] font-medium leading-none text-zinc-600">快速增加</p>
+                  </div>
                 </div>
-                <div className="mt-4 flex flex-wrap gap-2">
+                <div className="mt-3 grid grid-cols-2 gap-2">
                   {quickAmounts[type].map((step, index) => (
                     <motion.button
                       key={`${type}-${index}`}
@@ -628,9 +632,12 @@ function App() {
                       onPointerUp={() => endQuickStep(type, step)}
                       onPointerCancel={() => window.clearTimeout(pressTimer.current ?? undefined)}
                       onContextMenu={(event) => event.preventDefault()}
-                      className="min-w-14 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-white"
+                      className="h-12 rounded-[17px] border border-white/10 bg-white/[0.055] px-2 text-center shadow-inner shadow-white/5"
                     >
-                      +{meta.kind === 'time' ? formatDuration(step) : step}
+                      <span className="text-[12px] font-semibold text-zinc-500">+</span>
+                      <span className="ml-0.5 text-[19px] font-bold leading-none text-white tabular-nums">
+                        {meta.kind === 'time' ? formatDuration(step) : step}
+                      </span>
                     </motion.button>
                   ))}
                 </div>
@@ -643,18 +650,21 @@ function App() {
             return (
               <div
                 key={type}
-                className="rounded-[16px] border border-white/5 bg-zinc-900/80 p-4 shadow-xl shadow-black/20"
+                className="rounded-[22px] border border-white/5 bg-zinc-900/80 p-3.5 shadow-xl shadow-black/20"
                 style={{ boxShadow: `inset 0 0 30px ${meta.color}18` }}
               >
                 <div className="flex items-center gap-2">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-xl" style={{ backgroundColor: `${meta.color}18` }}>
+                  <span className="flex h-9 w-9 items-center justify-center rounded-[14px] [&_svg]:h-7 [&_svg]:w-7" style={{ backgroundColor: `${meta.color}18` }}>
                     <ExerciseIcon type={type} />
                   </span>
-                  <p className="min-w-0 text-sm font-semibold leading-5" style={{ color: meta.color }}>
-                    {meta.label}
-                  </p>
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] font-bold leading-none" style={{ color: meta.color }}>
+                      {meta.label}
+                    </p>
+                    <p className="mt-1 text-[10px] font-medium leading-none text-zinc-600">计时训练</p>
+                  </div>
                 </div>
-                <div className="mt-4 grid grid-cols-[1fr_auto] gap-2">
+                <div className="mt-3 grid grid-cols-[1fr_auto] gap-2">
                   <motion.button
                     whileTap={{ scale: 0.96 }}
                     onClick={() => {
@@ -666,7 +676,7 @@ function App() {
                       }
                       setTimerRunning((value) => !value);
                     }}
-                    className="h-11 rounded-2xl border px-3 text-left text-[13px] font-bold"
+                    className="h-12 rounded-[17px] border px-3 text-left text-[14px] font-bold tabular-nums"
                     style={{ borderColor: `${meta.color}90`, color: meta.color }}
                   >
                     {isActiveTimer && timerSeconds > 0 ? formatDuration(timerSeconds) : '开始计时'}
@@ -680,7 +690,7 @@ function App() {
                       }
                       saveTimer();
                     }}
-                    className="h-11 w-11 rounded-2xl border text-[11px] font-bold"
+                    className="h-12 w-12 rounded-[17px] border text-[11px] font-bold"
                     style={{ borderColor: `${meta.color}90`, color: meta.color }}
                   >
                     保存
@@ -693,10 +703,10 @@ function App() {
       </section>
 
       <section className="mt-4 px-4 pb-28">
-        <div className="rounded-[30px] border border-white/10 bg-zinc-950/70 p-4">
+        <div className="rounded-[28px] border border-white/10 bg-zinc-950/70 p-4">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-lg font-bold text-white">最近记录</h2>
-            <span className="text-sm text-zinc-500">{logs.length} 条</span>
+            <h2 className="text-[19px] font-bold leading-none text-white">最近记录</h2>
+            <span className="rounded-full bg-white/[0.06] px-3 py-1 text-[11px] font-semibold text-zinc-500">{logs.length} 条</span>
           </div>
           <div className="space-y-1">
             {logs.length === 0 ? (
@@ -705,11 +715,11 @@ function App() {
             {logs.slice(0, 6).map((entry) => (
               <div
                 key={entry.id}
-                className="flex w-full items-center justify-between gap-3 rounded-2xl px-2 py-3 text-left"
+                className="flex w-full items-center justify-between gap-3 rounded-[18px] px-2 py-2.5 text-left"
               >
                 <button onClick={() => setDetailType(entry.type)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
                   <span
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] [&_svg]:h-7 [&_svg]:w-7"
                     style={{
                       backgroundColor: `${exerciseMeta[entry.type].color}22`,
                       color: exerciseMeta[entry.type].color
@@ -718,20 +728,21 @@ function App() {
                     <ExerciseIcon type={entry.type} />
                   </span>
                   <div>
-                    <p className="text-sm font-semibold text-white">{exerciseMeta[entry.type].label}</p>
-                    <p className="text-xs text-zinc-500">
+                    <p className="text-[14px] font-semibold leading-none text-white">{exerciseMeta[entry.type].label}</p>
+                    <p className="mt-1.5 text-[11px] font-medium leading-none text-zinc-500">
                       {new Date(entry.createdAt).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })}{' '}
                       {new Date(entry.createdAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
                 </button>
-                <div className="flex shrink-0 items-center gap-2">
-                  <p className="text-base font-bold text-white">
-                    +{formatAmount(entry.type, entry.amount)} {formatUnit(entry.type)}
+                <div className="flex shrink-0 items-center gap-2.5">
+                  <p className="min-w-[58px] text-right text-[17px] font-bold leading-none text-white tabular-nums">
+                    +{formatAmount(entry.type, entry.amount)}
+                    <span className="ml-1 text-[11px] font-semibold text-zinc-500">{formatUnit(entry.type)}</span>
                   </p>
                   <button
                     onClick={() => deleteRecord(entry.id)}
-                    className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-zinc-400"
+                    className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-bold text-zinc-400"
                   >
                     删除
                   </button>
@@ -768,24 +779,30 @@ function App() {
       <div className="mt-4 rounded-[30px] bg-zinc-900 p-4">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-zinc-500">最近 7 天</p>
-            <h2 className="mt-1 text-xl font-bold text-white">训练趋势</h2>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500">最近 7 天</p>
+            <h2 className="mt-1 text-[22px] font-bold leading-none text-white">训练趋势</h2>
           </div>
-          <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-zinc-400">Recharts</span>
+          <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-zinc-400">次数 / 分钟</span>
         </div>
         <div className="mt-5 h-72">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={trendData} margin={{ top: 8, right: 0, left: -24, bottom: 0 }}>
-              <CartesianGrid stroke="rgba(255,255,255,0.07)" vertical={false} />
-              <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: '#71717a', fontSize: 12 }} />
-              <YAxis axisLine={false} tickLine={false} tick={{ fill: '#71717a', fontSize: 12 }} />
+            <BarChart data={trendData} margin={{ top: 8, right: 2, left: -28, bottom: 0 }} barGap={4} barCategoryGap="28%">
+              <CartesianGrid stroke={isLightTheme ? 'rgba(15,23,42,0.08)' : 'rgba(255,255,255,0.07)'} vertical={false} />
+              <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: isLightTheme ? '#64748b' : '#71717a', fontSize: 11, fontWeight: 600 }} />
+              <YAxis axisLine={false} tickLine={false} tick={{ fill: isLightTheme ? '#64748b' : '#71717a', fontSize: 11, fontWeight: 600 }} />
               <Tooltip
                 cursor={{ fill: 'rgba(255,255,255,0.04)' }}
-                contentStyle={{ background: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 18 }}
-                labelStyle={{ color: '#fff' }}
+                contentStyle={{
+                  background: isLightTheme ? 'rgba(255,255,255,0.96)' : '#18181b',
+                  border: isLightTheme ? '1px solid rgba(15,23,42,0.1)' : '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: 18,
+                  boxShadow: '0 18px 45px rgba(0,0,0,0.18)'
+                }}
+                labelStyle={{ color: isLightTheme ? '#111827' : '#fff', fontWeight: 700 }}
+                itemStyle={{ fontWeight: 700 }}
               />
-              <Bar dataKey="count" name="次数" fill="#4f7cff" radius={[10, 10, 10, 10]} />
-              <Bar dataKey="time" name="分钟" fill="#b85cff" radius={[10, 10, 10, 10]} />
+              <Bar dataKey="count" name="次数" fill="#4f7cff" radius={[9, 9, 9, 9]} maxBarSize={20} />
+              <Bar dataKey="time" name="分钟" fill="#b85cff" radius={[9, 9, 9, 9]} maxBarSize={20} />
             </BarChart>
           </ResponsiveContainer>
         </div>
