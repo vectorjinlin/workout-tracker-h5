@@ -29,7 +29,6 @@ type ExerciseMeta = {
   label: string;
   unit: string;
   defaultValue: number;
-  best: number;
   color: string;
   glow: string;
   kind: 'count' | 'time';
@@ -45,7 +44,6 @@ const exerciseMeta: Record<EntryType, ExerciseMeta> = {
     label: '俯卧撑',
     unit: '次',
     defaultValue: 20,
-    best: 240,
     color: '#4f7cff',
     glow: 'shadow-blue-500/20',
     kind: 'count'
@@ -54,7 +52,6 @@ const exerciseMeta: Record<EntryType, ExerciseMeta> = {
     label: '引体向上',
     unit: '次',
     defaultValue: 6,
-    best: 81,
     color: '#45d67b',
     glow: 'shadow-emerald-500/20',
     kind: 'count'
@@ -63,7 +60,6 @@ const exerciseMeta: Record<EntryType, ExerciseMeta> = {
     label: '平板支撑',
     unit: '分钟',
     defaultValue: 90,
-    best: 750,
     color: '#b85cff',
     glow: 'shadow-purple-500/20',
     kind: 'time'
@@ -72,7 +68,6 @@ const exerciseMeta: Record<EntryType, ExerciseMeta> = {
     label: '倒立',
     unit: '分钟',
     defaultValue: 45,
-    best: 500,
     color: '#ff9f2f',
     glow: 'shadow-amber-500/20',
     kind: 'time'
@@ -307,25 +302,54 @@ function App() {
 
   const logs = useMemo(() => [...entries].sort((a, b) => b.createdAt - a.createdAt), [entries]);
 
+  const dailySummaries = useMemo(() => {
+    return entries.reduce<Record<string, Record<EntryType, number>>>((acc, entry) => {
+      acc[entry.date] ??= { pushups: 0, pullups: 0, plank: 0, handstand: 0 };
+      acc[entry.date][entry.type] += entry.amount;
+      return acc;
+    }, {});
+  }, [entries]);
+
+  const bestSummary = useMemo(() => {
+    return Object.values(dailySummaries).reduce<Record<EntryType, number>>(
+      (acc, day) => {
+        order.forEach((type) => {
+          acc[type] = Math.max(acc[type], day[type]);
+        });
+        return acc;
+      },
+      { pushups: 0, pullups: 0, plank: 0, handstand: 0 }
+    );
+  }, [dailySummaries]);
+
+  const trainingDays = useMemo(() => Object.keys(dailySummaries).length, [dailySummaries]);
+
+  const streakDays = useMemo(() => {
+    const trainedDates = new Set(Object.keys(dailySummaries));
+    let cursor = new Date();
+    let streak = 0;
+
+    while (trainedDates.has(dateKey(cursor))) {
+      streak += 1;
+      cursor.setDate(cursor.getDate() - 1);
+    }
+
+    return streak;
+  }, [dailySummaries]);
+
   const trendData = useMemo(() => {
     return Array.from({ length: 7 }, (_, index) => {
       const date = new Date();
       date.setDate(date.getDate() - (6 - index));
       const key = dateKey(date);
-      const dayEntries = entries.filter((entry) => entry.date === key);
+      const daySummary = dailySummaries[key] ?? { pushups: 0, pullups: 0, plank: 0, handstand: 0 };
       return {
         date: `${date.getMonth() + 1}/${date.getDate()}`,
-        count: dayEntries
-          .filter((entry) => exerciseMeta[entry.type].kind === 'count')
-          .reduce((total, entry) => total + entry.amount, 0),
-        time: Math.round(
-          dayEntries
-            .filter((entry) => exerciseMeta[entry.type].kind === 'time')
-            .reduce((total, entry) => total + entry.amount, 0) / 60
-        )
+        count: daySummary.pushups + daySummary.pullups,
+        time: Math.round((daySummary.plank + daySummary.handstand) / 60)
       };
     });
-  }, [entries]);
+  }, [dailySummaries]);
 
   const totalMinutes = Math.round((summary.plank + summary.handstand) / 60);
   const totalReps = summary.pushups + summary.pullups;
@@ -418,8 +442,9 @@ function App() {
             </p>
           </div>
           <div className="pt-1 text-right">
-            <p className="text-xs text-zinc-500">连续训练</p>
-            <p className="mt-1 text-2xl font-bold text-orange-300">18天</p>
+            <p className="text-xs text-zinc-500">训练天数</p>
+            <p className="mt-1 text-2xl font-bold text-orange-300">{trainingDays}天</p>
+            <p className="mt-1 text-[11px] font-medium text-zinc-600">连续 {streakDays} 天</p>
           </div>
         </div>
       </header>
@@ -447,7 +472,7 @@ function App() {
               </p>
               <p className="mt-2 text-xs text-zinc-400">{formatUnit(type)}</p>
               <p className="mt-3 whitespace-nowrap text-[10px] text-zinc-500">
-                最佳 {meta.kind === 'time' ? formatDuration(meta.best) : meta.best} {formatUnit(type)}
+                最佳 {formatAmount(type, bestSummary[type])} {formatUnit(type)}
               </p>
             </motion.button>
           );
@@ -606,6 +631,14 @@ function App() {
       <h1 className="text-center text-xl font-bold text-white">趋势</h1>
       <div className="mt-6 grid grid-cols-2 gap-3">
         <div className="rounded-[26px] bg-zinc-900 p-4">
+          <p className="text-sm text-zinc-500">训练天数</p>
+          <p className="mt-3 text-4xl font-bold text-white">{trainingDays}</p>
+        </div>
+        <div className="rounded-[26px] bg-zinc-900 p-4">
+          <p className="text-sm text-zinc-500">连续天数</p>
+          <p className="mt-3 text-4xl font-bold text-white">{streakDays}</p>
+        </div>
+        <div className="rounded-[26px] bg-zinc-900 p-4">
           <p className="text-sm text-zinc-500">今日次数</p>
           <p className="mt-3 text-4xl font-bold text-white">{totalReps}</p>
         </div>
@@ -756,11 +789,7 @@ function App() {
                     </div>
                     <div className="rounded-[24px] bg-white/[0.06] p-4">
                       <p className="text-xs text-zinc-500">最佳</p>
-                      <p className="mt-2 text-3xl font-bold text-white">
-                        {exerciseMeta[detailType].kind === 'time'
-                          ? formatDuration(exerciseMeta[detailType].best)
-                          : exerciseMeta[detailType].best}
-                      </p>
+                      <p className="mt-2 text-3xl font-bold text-white">{formatAmount(detailType, bestSummary[detailType])}</p>
                     </div>
                   </div>
                 </>
