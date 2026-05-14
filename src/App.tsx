@@ -13,6 +13,7 @@ import {
 type EntryType = 'pushups' | 'pullups' | 'plank' | 'handstand';
 type Tab = 'today' | 'trends' | 'settings';
 type Theme = 'dark' | 'light';
+type Language = 'zh' | 'en';
 type QuickTarget = {
   index: number;
   type: Extract<EntryType, 'pushups' | 'pullups'>;
@@ -40,7 +41,8 @@ const databaseVersion = 1;
 const entryStoreName = 'workout_entries';
 const quickAmountsStorageKey = 'workout-tracker-h5-quick-amounts';
 const themeStorageKey = 'workout-tracker-h5-theme';
-const appVersion = 'v0.1.9';
+const languageStorageKey = 'workout-tracker-h5-language';
+const appVersion = 'v0.2.0';
 
 const exerciseMeta: Record<EntryType, ExerciseMeta> = {
   pushups: {
@@ -113,12 +115,6 @@ const getAmountTextClass = (type: EntryType, amount: number) => {
   return text.length > 3 ? 'text-[17px]' : 'text-[20px]';
 };
 
-const getBestTextClass = (type: EntryType, amount: number) => {
-  const text = `最佳 ${formatAmount(type, amount)} ${formatUnit(type)}`;
-  if (text.length > 10) return 'text-[9px] leading-[12px]';
-  return 'text-[10px] leading-[13px]';
-};
-
 const loadQuickAmounts = () => {
   try {
     const raw = localStorage.getItem(quickAmountsStorageKey);
@@ -138,6 +134,27 @@ const loadTheme = (): Theme => {
     return localStorage.getItem(themeStorageKey) === 'light' ? 'light' : 'dark';
   } catch {
     return 'dark';
+  }
+};
+
+const loadLanguage = (): Language => {
+  try {
+    return localStorage.getItem(languageStorageKey) === 'en' ? 'en' : 'zh';
+  } catch {
+    return 'zh';
+  }
+};
+
+const navLabels: Record<Language, Record<Tab, string>> = {
+  zh: {
+    today: '今日',
+    trends: '趋势',
+    settings: '设置'
+  },
+  en: {
+    today: 'Today',
+    trends: 'Trends',
+    settings: 'Settings'
   }
 };
 
@@ -369,6 +386,7 @@ function App() {
   const [detailType, setDetailType] = useState<EntryType | null>(null);
   const [quickTarget, setQuickTarget] = useState<QuickTarget | null>(null);
   const [theme, setTheme] = useState<Theme>(() => loadTheme());
+  const [language, setLanguage] = useState<Language>(() => loadLanguage());
   const [quickAmounts, setQuickAmounts] = useState(defaultQuickAmounts);
   const [customValue, setCustomValue] = useState('');
   const [timerType, setTimerType] = useState<EntryType>('plank');
@@ -407,6 +425,10 @@ function App() {
   }, [theme]);
 
   useEffect(() => {
+    localStorage.setItem(languageStorageKey, language);
+  }, [language]);
+
+  useEffect(() => {
     if (!timerRunning) return undefined;
     const interval = window.setInterval(() => {
       setTimerSeconds((value) => value + 1);
@@ -438,18 +460,6 @@ function App() {
       return acc;
     }, {});
   }, [entries]);
-
-  const bestSummary = useMemo(() => {
-    return Object.values(dailySummaries).reduce<Record<EntryType, number>>(
-      (acc, day) => {
-        order.forEach((type) => {
-          acc[type] = Math.max(acc[type], day[type]);
-        });
-        return acc;
-      },
-      { pushups: 0, pullups: 0, plank: 0, handstand: 0 }
-    );
-  }, [dailySummaries]);
 
   const trainingDays = useMemo(() => Object.keys(dailySummaries).length, [dailySummaries]);
 
@@ -602,7 +612,7 @@ function App() {
               layout
               key={type}
               onClick={() => setDetailType(type)}
-              className={`min-w-0 overflow-hidden rounded-[18px] bg-zinc-900/90 px-2 py-3 text-center shadow-xl ${meta.glow}`}
+              className="min-w-0 overflow-hidden rounded-[18px] border border-white/10 bg-zinc-900/90 px-2 py-3 text-center"
               whileTap={{ scale: 0.98 }}
             >
               <div
@@ -616,9 +626,6 @@ function App() {
                 {formatAmount(type, summary[type])}
               </p>
               <p className="mt-1 text-[10px] leading-none text-zinc-400">{formatUnit(type)}</p>
-              <p className={`mx-auto mt-1.5 max-w-full break-words text-zinc-500 ${getBestTextClass(type, bestSummary[type])}`}>
-                最佳 {formatAmount(type, bestSummary[type])} {formatUnit(type)}
-              </p>
             </motion.button>
           );
         })}
@@ -635,8 +642,7 @@ function App() {
             return (
               <div
                 key={type}
-                className="rounded-[20px] border border-white/5 bg-zinc-900/80 p-3 shadow-lg shadow-black/15"
-                style={{ boxShadow: `inset 0 0 34px ${meta.color}10` }}
+                className="rounded-[20px] border border-white/10 bg-zinc-900/80 p-3"
               >
                 <div className="flex items-center gap-2">
                   <span className="flex h-8 w-8 items-center justify-center rounded-[13px] [&_svg]:h-6 [&_svg]:w-6" style={{ backgroundColor: `${meta.color}18` }}>
@@ -658,9 +664,9 @@ function App() {
                       onPointerUp={() => endQuickStep(type, step)}
                       onPointerCancel={() => window.clearTimeout(pressTimer.current ?? undefined)}
                       onContextMenu={(event) => event.preventDefault()}
-                      className="h-10 rounded-[15px] border border-white/10 bg-white/[0.055] px-2 text-center shadow-inner shadow-white/5"
+                      className="flex h-10 items-center justify-center rounded-[15px] border border-white/10 bg-white/[0.055] px-2 text-center"
                     >
-                      <span className="text-[10px] font-semibold text-zinc-500">+</span>
+                      <span className="translate-y-[-1px] text-[10px] font-semibold leading-none text-zinc-500">+</span>
                       <span className="ml-0.5 text-[16px] font-bold leading-none text-white tabular-nums">
                         {meta.kind === 'time' ? formatDuration(step) : step}
                       </span>
@@ -676,8 +682,7 @@ function App() {
             return (
               <div
                 key={type}
-                className="rounded-[20px] border border-white/5 bg-zinc-900/80 p-3 shadow-lg shadow-black/15"
-                style={{ boxShadow: `inset 0 0 30px ${meta.color}18` }}
+                className="rounded-[20px] border border-white/10 bg-zinc-900/80 p-3"
               >
                 <div className="flex items-center gap-2">
                   <span className="flex h-8 w-8 items-center justify-center rounded-[13px] [&_svg]:h-6 [&_svg]:w-6" style={{ backgroundColor: `${meta.color}18` }}>
@@ -764,7 +769,6 @@ function App() {
                 <div className="flex shrink-0 items-center gap-2.5">
                   <p className="min-w-[54px] text-right text-[14px] font-bold leading-none text-white tabular-nums">
                     +{formatAmount(entry.type, entry.amount)}
-                    <span className="ml-1 text-[10px] font-semibold text-zinc-500">{formatUnit(entry.type)}</span>
                   </p>
                   <button
                     onClick={() => deleteRecord(entry.id)}
@@ -842,6 +846,7 @@ function App() {
       <div className="mt-6 space-y-3">
         {[
           `当前外观：${theme === 'dark' ? '深色模式' : '浅色模式'}`,
+          `当前语言：${language === 'zh' ? '中文' : 'English'}`,
           '数据保存在本机 IndexedDB，手机访问时即存于手机本地',
           '长按快捷按钮可自定义数量',
           '保存计时后会写入最近记录'
@@ -858,6 +863,15 @@ function App() {
         <span>外观模式</span>
         <span className="rounded-full bg-white px-4 py-2 text-xs text-black">
           {theme === 'dark' ? '切换浅色' : '切换深色'}
+        </span>
+      </button>
+      <button
+        onClick={() => setLanguage((value) => (value === 'zh' ? 'en' : 'zh'))}
+        className="mt-3 flex w-full items-center justify-between rounded-full border border-white/10 bg-white/[0.06] px-5 py-4 text-sm font-bold text-white"
+      >
+        <span>语言</span>
+        <span className="rounded-full bg-white px-4 py-2 text-xs text-black">
+          {language === 'zh' ? 'Switch English' : '切换中文'}
         </span>
       </button>
       <button
@@ -975,14 +989,10 @@ function App() {
                       {exerciseMeta[detailType].kind === 'time' ? '计时' : '次数'}
                     </span>
                   </div>
-                  <div className="mt-5 grid grid-cols-2 gap-3">
+                  <div className="mt-5 grid grid-cols-1 gap-3">
                     <div className="rounded-[24px] bg-white/[0.06] p-4">
                       <p className="text-xs text-zinc-500">今日</p>
                       <p className="mt-2 text-3xl font-bold text-white">{formatAmount(detailType, summary[detailType])}</p>
-                    </div>
-                    <div className="rounded-[24px] bg-white/[0.06] p-4">
-                      <p className="text-xs text-zinc-500">最佳</p>
-                      <p className="mt-2 text-3xl font-bold text-white">{formatAmount(detailType, bestSummary[detailType])}</p>
                     </div>
                   </div>
                 </>
@@ -995,9 +1005,9 @@ function App() {
       <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-black/80 backdrop-blur-2xl">
         <div className="mx-auto flex max-w-md items-center justify-around px-6 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-3">
           {[
-            { key: 'today' as Tab, label: 'Today' },
-            { key: 'trends' as Tab, label: 'Trends' },
-            { key: 'settings' as Tab, label: 'Settings' }
+            { key: 'today' as Tab, label: navLabels[language].today },
+            { key: 'trends' as Tab, label: navLabels[language].trends },
+            { key: 'settings' as Tab, label: navLabels[language].settings }
           ].map((item) => (
             <button
               key={item.key}
