@@ -82,6 +82,7 @@ const defaultQuickAmounts: Record<QuickTarget['type'], number[]> = {
 };
 
 const pad = (value: number) => String(value).padStart(2, '0');
+const randomInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
 
 const dateKey = (date: Date) =>
   `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
@@ -239,10 +240,64 @@ const clearEntriesFromDatabase = async () => {
   }
 };
 
+const saveEntriesToDatabase = async (entries: Entry[]) => {
+  if (entries.length === 0) return;
+
+  const db = await openWorkoutDatabase();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction(entryStoreName, 'readwrite');
+      const store = transaction.objectStore(entryStoreName);
+
+      entries.forEach((entry) => store.put(entry));
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error);
+    });
+  } finally {
+    db.close();
+  }
+};
+
+const randomAmountForType = (type: EntryType) => {
+  if (type === 'pushups') return randomInt(8, 45);
+  if (type === 'pullups') return randomInt(2, 12);
+  if (type === 'plank') return randomInt(30, 210);
+  return randomInt(10, 120);
+};
+
+const createRandomHistoryEntries = () => {
+  const days = randomInt(15, 60);
+  const now = Date.now();
+  const generated: Entry[] = [];
+
+  Array.from({ length: days }, (_, dayIndex) => {
+    const date = new Date();
+    date.setDate(date.getDate() - (days - 1 - dayIndex));
+    const records = randomInt(2, 6);
+
+    Array.from({ length: records }, (_, recordIndex) => {
+      const type = order[randomInt(0, order.length - 1)];
+      const createdAt = new Date(date);
+      createdAt.setHours(randomInt(6, 22), randomInt(0, 59), randomInt(0, 59), randomInt(0, 999));
+
+      generated.push({
+        id: `test-${now}-${dayIndex}-${recordIndex}-${type}`,
+        date: dateKey(createdAt),
+        type,
+        amount: randomAmountForType(type),
+        createdAt: createdAt.getTime()
+      });
+    });
+  });
+
+  return generated;
+};
+
 function App() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [activeTab, setActiveTab] = useState<Tab>('today');
-  const [toast, setToast] = useState<{ text: string; id: string } | null>(null);
+  const [toast, setToast] = useState<{ text: string; id?: string } | null>(null);
   const [detailType, setDetailType] = useState<EntryType | null>(null);
   const [quickTarget, setQuickTarget] = useState<QuickTarget | null>(null);
   const [quickAmounts, setQuickAmounts] = useState(defaultQuickAmounts);
@@ -388,6 +443,19 @@ function App() {
     await clearEntriesFromDatabase();
     setEntries([]);
     setToast(null);
+  }
+
+  async function generateRandomHistory() {
+    const generated = createRandomHistoryEntries();
+    const generatedDays = new Set(generated.map((entry) => entry.date)).size;
+    const confirmed = window.confirm(`将追加 ${generatedDays} 天、${generated.length} 条随机测试数据，用于测试历史统计。继续吗？`);
+    if (!confirmed) return;
+
+    await saveEntriesToDatabase(generated);
+    setEntries((current) => [...generated, ...current]);
+    setToast({ text: `已生成 ${generatedDays} 天 ${generated.length} 条测试数据` });
+    window.clearTimeout(toastTimer.current ?? undefined);
+    toastTimer.current = window.setTimeout(() => setToast(null), 2800);
   }
 
   function startLongPress(type: QuickTarget['type'], index: number) {
@@ -691,6 +759,12 @@ function App() {
       >
         一键清空所有数据
       </button>
+      <button
+        onClick={generateRandomHistory}
+        className="mt-3 w-full rounded-full border border-white/10 bg-white/[0.06] px-5 py-4 text-sm font-bold text-white"
+      >
+        随机生成 15-60 天测试数据
+      </button>
     </div>
   );
 
@@ -722,9 +796,11 @@ function App() {
           >
             <div className="flex items-center justify-between gap-4">
               <p className="text-sm font-semibold text-white">{toast.text}</p>
-              <button onClick={() => undoRecord(toast.id)} className="rounded-full bg-white px-4 py-2 text-xs font-bold text-black">
-                撤销
-              </button>
+              {toast.id ? (
+                <button onClick={() => undoRecord(toast.id!)} className="rounded-full bg-white px-4 py-2 text-xs font-bold text-black">
+                  撤销
+                </button>
+              ) : null}
             </div>
           </motion.div>
         )}
