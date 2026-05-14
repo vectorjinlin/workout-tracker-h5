@@ -1,9 +1,9 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Bar,
-  BarChart,
   CartesianGrid,
+  Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -14,6 +14,7 @@ type EntryType = 'pushups' | 'pullups' | 'plank' | 'handstand';
 type Tab = 'today' | 'trends' | 'settings';
 type Theme = 'dark' | 'light';
 type Language = 'zh' | 'en';
+type TrendRange = 7 | 30;
 type QuickTarget = {
   index: number;
   type: Extract<EntryType, 'pushups' | 'pullups'>;
@@ -42,7 +43,120 @@ const entryStoreName = 'workout_entries';
 const quickAmountsStorageKey = 'workout-tracker-h5-quick-amounts';
 const themeStorageKey = 'workout-tracker-h5-theme';
 const languageStorageKey = 'workout-tracker-h5-language';
-const appVersion = 'v0.2.0';
+const appVersion = 'v0.2.1';
+
+const text = {
+  zh: {
+    workout: 'Workout',
+    todayTitle: '今日训练',
+    trainingDays: '训练天数',
+    consecutive: '连续',
+    days: '天',
+    quickLog: '快捷记录',
+    longPress: '长按自定义',
+    quickAdd: '快速增加',
+    timedTraining: '计时训练',
+    startTimer: '开始计时',
+    save: '保存',
+    saveTimer: '保存',
+    recentLogs: '最近记录',
+    emptyLogs: '暂无记录',
+    delete: '删除',
+    trends: '趋势',
+    totalDays: '训练天数',
+    streakDays: '连续天数',
+    todayReps: '今日次数',
+    timedMinutes: '计时分钟',
+    recentDays: '最近',
+    trendTitle: '训练走势',
+    settings: '设置',
+    currentTheme: '当前外观',
+    currentLanguage: '当前语言',
+    darkMode: '深色模式',
+    lightMode: '浅色模式',
+    localData: '数据保存在本机 IndexedDB，手机访问时即存于手机本地',
+    longPressTip: '长按快捷按钮可自定义数量',
+    timerTip: '保存计时后会写入最近记录',
+    appearance: '外观模式',
+    switchLight: '切换浅色',
+    switchDark: '切换深色',
+    language: '语言',
+    switchEnglish: 'Switch English',
+    switchChinese: '切换中文',
+    generateData: '随机生成 15-60 天测试数据',
+    clearToday: '清除当天数据',
+    initData: '初始化数据',
+    version: '版本',
+    editQuick: '编辑快捷按钮',
+    quickAmount: '每次增加数量',
+    saveQuick: '保存快捷数量',
+    details: '训练详情',
+    count: '次数',
+    timed: '计时',
+    today: '今日',
+    noTodayData: '今天还没有训练数据',
+    todayCleared: '已清除当天数据',
+    initConfirm: '确定初始化数据吗？这会清空这台设备上的所有训练数据，此操作不可撤销。',
+    clearTodayConfirm: (count: number) => `确定清除今天的 ${count} 条训练数据吗？历史数据不会受影响。`,
+    generateConfirm: (days: number, count: number) => `将追加 ${days} 天、${count} 条随机测试数据，用于测试历史统计。继续吗？`,
+    generated: (days: number, count: number) => `已生成 ${days} 天 ${count} 条测试数据`
+  },
+  en: {
+    workout: 'Workout',
+    todayTitle: 'Today',
+    trainingDays: 'Days',
+    consecutive: 'Streak',
+    days: 'd',
+    quickLog: 'Quick Log',
+    longPress: 'Long press',
+    quickAdd: 'Quick add',
+    timedTraining: 'Timer',
+    startTimer: 'Start',
+    save: 'Save',
+    saveTimer: 'Save',
+    recentLogs: 'Recent Logs',
+    emptyLogs: 'No records',
+    delete: 'Delete',
+    trends: 'Trends',
+    totalDays: 'Days',
+    streakDays: 'Streak',
+    todayReps: 'Today Reps',
+    timedMinutes: 'Minutes',
+    recentDays: 'Last',
+    trendTitle: 'Training Trend',
+    settings: 'Settings',
+    currentTheme: 'Theme',
+    currentLanguage: 'Language',
+    darkMode: 'Dark',
+    lightMode: 'Light',
+    localData: 'Data is saved locally in this browser with IndexedDB',
+    longPressTip: 'Long press quick buttons to customize amounts',
+    timerTip: 'Saved timers are added to recent logs',
+    appearance: 'Appearance',
+    switchLight: 'Switch Light',
+    switchDark: 'Switch Dark',
+    language: 'Language',
+    switchEnglish: 'Switch English',
+    switchChinese: '切换中文',
+    generateData: 'Generate 15-60 Days Test Data',
+    clearToday: 'Clear Today',
+    initData: 'Initialize Data',
+    version: 'Version',
+    editQuick: 'Edit Quick Button',
+    quickAmount: 'Amount per tap',
+    saveQuick: 'Save Quick Amount',
+    details: 'Details',
+    count: 'Reps',
+    timed: 'Timed',
+    today: 'Today',
+    noTodayData: 'No training data today',
+    todayCleared: 'Today cleared',
+    initConfirm: 'Initialize data? This will clear all workout records on this device.',
+    clearTodayConfirm: (count: number) => `Clear ${count} records from today? History will not be affected.`,
+    generateConfirm: (days: number, count: number) => `Append ${days} days and ${count} random records for testing?`,
+    generated: (days: number, count: number) => `Generated ${days} days and ${count} records`
+  }
+} satisfies Record<Language, Record<string, string | ((...args: number[]) => string)>>;
 
 const exerciseMeta: Record<EntryType, ExerciseMeta> = {
   pushups: {
@@ -155,6 +269,32 @@ const navLabels: Record<Language, Record<Tab, string>> = {
     today: 'Today',
     trends: 'Trends',
     settings: 'Settings'
+  }
+};
+
+const exerciseLabels: Record<Language, Record<EntryType, string>> = {
+  zh: {
+    pushups: '俯卧撑',
+    pullups: '引体向上',
+    plank: '平板支撑',
+    handstand: '倒立'
+  },
+  en: {
+    pushups: 'Push-ups',
+    pullups: 'Pull-ups',
+    plank: 'Plank',
+    handstand: 'Handstand'
+  }
+};
+
+const exerciseUnits: Record<Language, Record<'count' | 'time', string>> = {
+  zh: {
+    count: '次',
+    time: '分钟'
+  },
+  en: {
+    count: 'reps',
+    time: 'min'
   }
 };
 
@@ -387,6 +527,7 @@ function App() {
   const [quickTarget, setQuickTarget] = useState<QuickTarget | null>(null);
   const [theme, setTheme] = useState<Theme>(() => loadTheme());
   const [language, setLanguage] = useState<Language>(() => loadLanguage());
+  const [trendRange, setTrendRange] = useState<TrendRange>(7);
   const [quickAmounts, setQuickAmounts] = useState(defaultQuickAmounts);
   const [customValue, setCustomValue] = useState('');
   const [timerType, setTimerType] = useState<EntryType>('plank');
@@ -437,6 +578,9 @@ function App() {
   }, [timerRunning]);
 
   const today = todayKey();
+  const copy = text[language];
+  const labelFor = (type: EntryType) => exerciseLabels[language][type];
+  const unitFor = (type: EntryType) => exerciseUnits[language][exerciseMeta[type].kind];
   const todayEntries = useMemo(() => entries.filter((entry) => entry.date === today), [entries, today]);
 
   const summary = useMemo(
@@ -477,18 +621,20 @@ function App() {
   }, [dailySummaries]);
 
   const trendData = useMemo(() => {
-    return Array.from({ length: 7 }, (_, index) => {
+    return Array.from({ length: trendRange }, (_, index) => {
       const date = new Date();
-      date.setDate(date.getDate() - (6 - index));
+      date.setDate(date.getDate() - (trendRange - 1 - index));
       const key = dateKey(date);
       const daySummary = dailySummaries[key] ?? { pushups: 0, pullups: 0, plank: 0, handstand: 0 };
       return {
         date: `${date.getMonth() + 1}/${date.getDate()}`,
-        count: daySummary.pushups + daySummary.pullups,
-        time: Math.round((daySummary.plank + daySummary.handstand) / 60)
+        pushups: daySummary.pushups,
+        pullups: daySummary.pullups,
+        plank: Math.round(daySummary.plank / 60),
+        handstand: Math.round(daySummary.handstand / 60)
       };
     });
-  }, [dailySummaries]);
+  }, [dailySummaries, trendRange]);
 
   const totalMinutes = Math.round((summary.plank + summary.handstand) / 60);
   const totalReps = summary.pushups + summary.pullups;
@@ -506,7 +652,7 @@ function App() {
   }
 
   async function clearAllRecords() {
-    const confirmed = window.confirm('确定初始化数据吗？这会清空这台设备上的所有训练数据，此操作不可撤销。');
+    const confirmed = window.confirm(copy.initConfirm as string);
     if (!confirmed) return;
     await clearEntriesFromDatabase();
     setEntries([]);
@@ -516,17 +662,17 @@ function App() {
   async function clearTodayRecords() {
     const todayRecordCount = todayEntries.length;
     if (todayRecordCount === 0) {
-      setToast({ text: '今天还没有训练数据' });
+      setToast({ text: copy.noTodayData as string });
       window.clearTimeout(toastTimer.current ?? undefined);
       toastTimer.current = window.setTimeout(() => setToast(null), 2400);
       return;
     }
 
-    const confirmed = window.confirm(`确定清除今天的 ${todayRecordCount} 条训练数据吗？历史数据不会受影响。`);
+    const confirmed = window.confirm((copy.clearTodayConfirm as (count: number) => string)(todayRecordCount));
     if (!confirmed) return;
     await deleteEntriesByDateFromDatabase(today);
     setEntries((current) => current.filter((entry) => entry.date !== today));
-    setToast({ text: '已清除当天数据' });
+    setToast({ text: copy.todayCleared as string });
     window.clearTimeout(toastTimer.current ?? undefined);
     toastTimer.current = window.setTimeout(() => setToast(null), 2400);
   }
@@ -534,12 +680,12 @@ function App() {
   async function generateRandomHistory() {
     const generated = createRandomHistoryEntries();
     const generatedDays = new Set(generated.map((entry) => entry.date)).size;
-    const confirmed = window.confirm(`将追加 ${generatedDays} 天、${generated.length} 条随机测试数据，用于测试历史统计。继续吗？`);
+    const confirmed = window.confirm((copy.generateConfirm as (days: number, count: number) => string)(generatedDays, generated.length));
     if (!confirmed) return;
 
     await saveEntriesToDatabase(generated);
     setEntries((current) => [...generated, ...current]);
-    setToast({ text: `已生成 ${generatedDays} 天 ${generated.length} 条测试数据` });
+    setToast({ text: (copy.generated as (days: number, count: number) => string)(generatedDays, generated.length) });
     window.clearTimeout(toastTimer.current ?? undefined);
     toastTimer.current = window.setTimeout(() => setToast(null), 2800);
   }
@@ -590,16 +736,16 @@ function App() {
       <header className="px-4 pb-4 pt-4">
         <div className="flex items-end justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-600">Workout</p>
-            <h1 className="mt-1 text-[29px] font-bold leading-none tracking-normal text-white">今日训练</h1>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-600">{copy.workout as string}</p>
+            <h1 className="mt-1 text-[29px] font-bold leading-none tracking-normal text-white">{copy.todayTitle as string}</h1>
             <p className="mt-2 text-[13px] font-medium leading-none text-zinc-500">
-              {new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' })}
+              {new Date().toLocaleDateString(language === 'zh' ? 'zh-CN' : 'en-US', { month: 'long', day: 'numeric', weekday: 'short' })}
             </p>
           </div>
           <div className="shrink-0 pb-0.5 text-right">
-            <p className="text-[10px] font-semibold leading-none text-zinc-500">训练天数</p>
-            <p className="mt-1 text-[21px] font-bold leading-none text-orange-300 tabular-nums">{trainingDays}天</p>
-            <p className="mt-1 text-[10px] font-medium leading-none text-zinc-600">连续 {streakDays} 天</p>
+            <p className="text-[10px] font-semibold leading-none text-zinc-500">{copy.trainingDays as string}</p>
+            <p className="mt-1 text-[21px] font-bold leading-none text-orange-300 tabular-nums">{trainingDays}{copy.days as string}</p>
+            <p className="mt-1 text-[10px] font-medium leading-none text-zinc-600">{copy.consecutive as string} {streakDays}{copy.days as string}</p>
           </div>
         </div>
       </header>
@@ -621,11 +767,11 @@ function App() {
               >
                 <ExerciseIcon type={type} />
               </div>
-              <p className="h-7 overflow-hidden text-[10px] font-semibold leading-[14px] text-zinc-300">{meta.label}</p>
+              <p className="h-7 overflow-hidden text-[10px] font-semibold leading-[14px] text-zinc-300">{labelFor(type)}</p>
               <p className={`mt-1 truncate font-bold leading-none text-white tabular-nums ${getAmountTextClass(type, summary[type])}`}>
                 {formatAmount(type, summary[type])}
               </p>
-              <p className="mt-1 text-[10px] leading-none text-zinc-400">{formatUnit(type)}</p>
+              <p className="mt-1 text-[10px] leading-none text-zinc-400">{unitFor(type)}</p>
             </motion.button>
           );
         })}
@@ -633,8 +779,8 @@ function App() {
 
       <section className="mt-6 px-4">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-[18px] font-bold leading-none text-white">快捷记录</h2>
-          <span className="rounded-full bg-white/[0.06] px-2.5 py-1 text-[10px] font-semibold text-zinc-500">长按自定义</span>
+          <h2 className="text-[18px] font-bold leading-none text-white">{copy.quickLog as string}</h2>
+          <span className="rounded-full bg-white/[0.06] px-2.5 py-1 text-[10px] font-semibold text-zinc-500">{copy.longPress as string}</span>
         </div>
         <div className="grid grid-cols-2 gap-3">
           {countTypes.map((type) => {
@@ -650,9 +796,9 @@ function App() {
                   </span>
                   <div className="min-w-0">
                     <p className="truncate text-[12px] font-bold leading-none" style={{ color: meta.color }}>
-                      {meta.label}
+                      {labelFor(type)}
                     </p>
-                    <p className="mt-1 text-[9px] font-medium leading-none text-zinc-600">快速增加</p>
+                    <p className="mt-1 text-[9px] font-medium leading-none text-zinc-600">{copy.quickAdd as string}</p>
                   </div>
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2">
@@ -690,12 +836,12 @@ function App() {
                   </span>
                   <div className="min-w-0">
                     <p className="truncate text-[12px] font-bold leading-none" style={{ color: meta.color }}>
-                      {meta.label}
+                      {labelFor(type)}
                     </p>
-                    <p className="mt-1 text-[9px] font-medium leading-none text-zinc-600">计时训练</p>
+                    <p className="mt-1 text-[9px] font-medium leading-none text-zinc-600">{copy.timedTraining as string}</p>
                   </div>
                 </div>
-                <div className="mt-3 grid grid-cols-[1fr_auto] gap-2">
+                <div className="mt-3 grid grid-cols-1 gap-2">
                   <motion.button
                     whileTap={{ scale: 0.96 }}
                     onClick={() => {
@@ -705,27 +851,29 @@ function App() {
                         setTimerRunning(true);
                         return;
                       }
-                      setTimerRunning((value) => !value);
-                    }}
-                    className="h-10 rounded-[15px] border px-3 text-left text-[12px] font-bold tabular-nums"
-                    style={{ borderColor: `${meta.color}90`, color: meta.color }}
-                  >
-                    {isActiveTimer && timerSeconds > 0 ? formatDuration(timerSeconds) : '开始计时'}
-                  </motion.button>
-                  <button
-                    onClick={() => {
-                      if (!isActiveTimer) {
-                        setTimerType(type);
-                        setTimerSeconds(0);
+                      if (timerSeconds > 0) {
+                        saveTimer();
                         return;
                       }
-                      saveTimer();
+                      setTimerRunning(true);
                     }}
-                    className="h-10 w-10 rounded-[15px] border text-[10px] font-bold"
-                    style={{ borderColor: `${meta.color}90`, color: meta.color }}
+                    className="flex h-10 items-center justify-center rounded-[15px] border border-white/10 bg-white/[0.055] px-2 text-center"
                   >
-                    保存
-                  </button>
+                    {isActiveTimer && timerSeconds > 0 ? (
+                      <>
+                        <span className="mr-1 text-[10px] font-semibold leading-none" style={{ color: meta.color }}>
+                          {copy.saveTimer as string}
+                        </span>
+                        <span className="text-[16px] font-bold leading-none tabular-nums" style={{ color: meta.color }}>
+                          {formatDuration(timerSeconds)}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-[13px] font-bold leading-none" style={{ color: meta.color }}>
+                        {copy.startTimer as string}
+                      </span>
+                    )}
+                  </motion.button>
                 </div>
               </div>
             );
@@ -736,12 +884,12 @@ function App() {
       <section className="mt-4 px-4 pb-28">
         <div className="rounded-[28px] border border-white/10 bg-zinc-950/70 p-4">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-[18px] font-bold leading-none text-white">最近记录</h2>
-            <span className="rounded-full bg-white/[0.06] px-2.5 py-1 text-[10px] font-semibold text-zinc-500">{logs.length} 条</span>
+            <h2 className="text-[18px] font-bold leading-none text-white">{copy.recentLogs as string}</h2>
+            <span className="rounded-full bg-white/[0.06] px-2.5 py-1 text-[10px] font-semibold text-zinc-500">{logs.length}</span>
           </div>
           <div className="space-y-1">
             {logs.length === 0 ? (
-              <div className="rounded-2xl px-2 py-6 text-center text-sm font-medium text-zinc-600">暂无记录</div>
+              <div className="rounded-2xl px-2 py-6 text-center text-sm font-medium text-zinc-600">{copy.emptyLogs as string}</div>
             ) : null}
             {logs.slice(0, 6).map((entry) => (
               <div
@@ -759,10 +907,10 @@ function App() {
                     <ExerciseIcon type={entry.type} />
                   </span>
                   <div>
-                    <p className="text-[13px] font-semibold leading-none text-white">{exerciseMeta[entry.type].label}</p>
+                    <p className="text-[13px] font-semibold leading-none text-white">{labelFor(entry.type)}</p>
                     <p className="mt-1.5 text-[10px] font-medium leading-none text-zinc-500">
-                      {new Date(entry.createdAt).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })}{' '}
-                      {new Date(entry.createdAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                      {new Date(entry.createdAt).toLocaleDateString(language === 'zh' ? 'zh-CN' : 'en-US', { month: 'numeric', day: 'numeric' })}{' '}
+                      {new Date(entry.createdAt).toLocaleTimeString(language === 'zh' ? 'zh-CN' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
                 </button>
@@ -774,7 +922,7 @@ function App() {
                     onClick={() => deleteRecord(entry.id)}
                     className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-bold text-zinc-400"
                   >
-                    删除
+                    {copy.delete as string}
                   </button>
                 </div>
               </div>
@@ -787,36 +935,56 @@ function App() {
 
   const renderTrends = () => (
     <div className="px-5 pb-28 pt-7">
-      <h1 className="text-center text-xl font-bold text-white">趋势</h1>
+      <h1 className="text-center text-xl font-bold text-white">{copy.trends as string}</h1>
       <div className="mt-6 grid grid-cols-2 gap-3">
         <div className="rounded-[26px] bg-zinc-900 p-4">
-          <p className="text-sm text-zinc-500">训练天数</p>
+          <p className="text-sm text-zinc-500">{copy.totalDays as string}</p>
           <p className="mt-3 text-4xl font-bold text-white">{trainingDays}</p>
         </div>
         <div className="rounded-[26px] bg-zinc-900 p-4">
-          <p className="text-sm text-zinc-500">连续天数</p>
+          <p className="text-sm text-zinc-500">{copy.streakDays as string}</p>
           <p className="mt-3 text-4xl font-bold text-white">{streakDays}</p>
         </div>
         <div className="rounded-[26px] bg-zinc-900 p-4">
-          <p className="text-sm text-zinc-500">今日次数</p>
+          <p className="text-sm text-zinc-500">{copy.todayReps as string}</p>
           <p className="mt-3 text-4xl font-bold text-white">{totalReps}</p>
         </div>
         <div className="rounded-[26px] bg-zinc-900 p-4">
-          <p className="text-sm text-zinc-500">计时分钟</p>
+          <p className="text-sm text-zinc-500">{copy.timedMinutes as string}</p>
           <p className="mt-3 text-4xl font-bold text-white">{totalMinutes}</p>
         </div>
       </div>
       <div className="mt-4 rounded-[30px] bg-zinc-900 p-4">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500">最近 7 天</p>
-            <h2 className="mt-1 text-[22px] font-bold leading-none text-white">训练趋势</h2>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
+              {copy.recentDays as string} {trendRange} {copy.days as string}
+            </p>
+            <h2 className="mt-1 text-[22px] font-bold leading-none text-white">{copy.trendTitle as string}</h2>
           </div>
-          <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-zinc-400">次数 / 分钟</span>
+          <div className="flex rounded-full bg-white/[0.06] p-1">
+            {([7, 30] as TrendRange[]).map((range) => (
+              <button
+                key={range}
+                onClick={() => setTrendRange(range)}
+                className={`rounded-full px-3 py-1 text-[11px] font-bold ${trendRange === range ? 'bg-white text-black' : 'text-zinc-500'}`}
+              >
+                {range}{copy.days as string}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          {order.map((type) => (
+            <div key={type} className="flex items-center gap-2 text-[10px] font-semibold text-zinc-500">
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: exerciseMeta[type].color }} />
+              {labelFor(type)}
+            </div>
+          ))}
         </div>
         <div className="mt-5 h-72">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={trendData} margin={{ top: 8, right: 2, left: -28, bottom: 0 }} barGap={4} barCategoryGap="28%">
+            <LineChart data={trendData} margin={{ top: 8, right: 6, left: -28, bottom: 0 }}>
               <CartesianGrid stroke={isLightTheme ? 'rgba(15,23,42,0.08)' : 'rgba(255,255,255,0.07)'} vertical={false} />
               <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: isLightTheme ? '#64748b' : '#71717a', fontSize: 11, fontWeight: 600 }} />
               <YAxis axisLine={false} tickLine={false} tick={{ fill: isLightTheme ? '#64748b' : '#71717a', fontSize: 11, fontWeight: 600 }} />
@@ -831,9 +999,20 @@ function App() {
                 labelStyle={{ color: isLightTheme ? '#111827' : '#fff', fontWeight: 700 }}
                 itemStyle={{ fontWeight: 700 }}
               />
-              <Bar dataKey="count" name="次数" fill="#4f7cff" radius={[9, 9, 9, 9]} maxBarSize={20} />
-              <Bar dataKey="time" name="分钟" fill="#b85cff" radius={[9, 9, 9, 9]} maxBarSize={20} />
-            </BarChart>
+              {order.map((type) => (
+                <Line
+                  key={type}
+                  type="monotone"
+                  dataKey={type}
+                  name={labelFor(type)}
+                  stroke={exerciseMeta[type].color}
+                  strokeWidth={2.2}
+                  dot={{ r: trendRange === 7 ? 3 : 0, strokeWidth: 0, fill: exerciseMeta[type].color }}
+                  activeDot={{ r: 4 }}
+                  connectNulls
+                />
+              ))}
+            </LineChart>
           </ResponsiveContainer>
         </div>
       </div>
@@ -842,14 +1021,14 @@ function App() {
 
   const renderSettings = () => (
     <div className="px-5 pb-28 pt-7">
-      <h1 className="text-center text-xl font-bold text-white">设置</h1>
+      <h1 className="text-center text-xl font-bold text-white">{copy.settings as string}</h1>
       <div className="mt-6 space-y-3">
         {[
-          `当前外观：${theme === 'dark' ? '深色模式' : '浅色模式'}`,
-          `当前语言：${language === 'zh' ? '中文' : 'English'}`,
-          '数据保存在本机 IndexedDB，手机访问时即存于手机本地',
-          '长按快捷按钮可自定义数量',
-          '保存计时后会写入最近记录'
+          `${copy.currentTheme as string}: ${theme === 'dark' ? copy.darkMode as string : copy.lightMode as string}`,
+          `${copy.currentLanguage as string}: ${language === 'zh' ? '中文' : 'English'}`,
+          copy.localData as string,
+          copy.longPressTip as string,
+          copy.timerTip as string
         ].map((item) => (
           <div key={item} className="rounded-[24px] bg-zinc-900 px-4 py-4 text-sm font-medium text-zinc-300">
             {item}
@@ -860,41 +1039,41 @@ function App() {
         onClick={() => setTheme((value) => (value === 'dark' ? 'light' : 'dark'))}
         className="mt-5 flex w-full items-center justify-between rounded-full border border-white/10 bg-white/[0.06] px-5 py-4 text-sm font-bold text-white"
       >
-        <span>外观模式</span>
+        <span>{copy.appearance as string}</span>
         <span className="rounded-full bg-white px-4 py-2 text-xs text-black">
-          {theme === 'dark' ? '切换浅色' : '切换深色'}
+          {theme === 'dark' ? copy.switchLight as string : copy.switchDark as string}
         </span>
       </button>
       <button
         onClick={() => setLanguage((value) => (value === 'zh' ? 'en' : 'zh'))}
         className="mt-3 flex w-full items-center justify-between rounded-full border border-white/10 bg-white/[0.06] px-5 py-4 text-sm font-bold text-white"
       >
-        <span>语言</span>
+        <span>{copy.language as string}</span>
         <span className="rounded-full bg-white px-4 py-2 text-xs text-black">
-          {language === 'zh' ? 'Switch English' : '切换中文'}
+          {language === 'zh' ? copy.switchEnglish as string : copy.switchChinese as string}
         </span>
       </button>
       <button
         onClick={generateRandomHistory}
         className="mt-5 w-full rounded-full border border-white/10 bg-white/[0.06] px-5 py-4 text-sm font-bold text-white"
       >
-        随机生成 15-60 天测试数据
+        {copy.generateData as string}
       </button>
       <div className="mt-8 space-y-3">
         <button
           onClick={clearTodayRecords}
           className="w-full rounded-full border border-white/10 bg-white/[0.06] px-5 py-4 text-sm font-bold text-white"
         >
-          清除当天数据
+          {copy.clearToday as string}
         </button>
         <button
           onClick={clearAllRecords}
           className="w-full rounded-full bg-white px-5 py-4 text-sm font-bold text-black"
         >
-          初始化数据
+          {copy.initData as string}
         </button>
       </div>
-      <p className="mt-6 text-center text-[11px] font-semibold text-zinc-700">版本 {appVersion}</p>
+      <p className="mt-6 text-center text-[11px] font-semibold text-zinc-700">{copy.version as string} {appVersion}</p>
     </div>
   );
 
@@ -960,9 +1139,9 @@ function App() {
               <div className="mx-auto mb-5 h-1 w-12 rounded-full bg-white/20" />
               {quickTarget ? (
                 <>
-                  <p className="text-sm text-zinc-500">编辑快捷按钮</p>
-                  <h2 className="mt-1 text-2xl font-bold text-white">{exerciseMeta[quickTarget.type].label}</h2>
-                  <label className="mt-5 block text-sm text-zinc-500">每次增加数量</label>
+                  <p className="text-sm text-zinc-500">{copy.editQuick as string}</p>
+                  <h2 className="mt-1 text-2xl font-bold text-white">{labelFor(quickTarget.type)}</h2>
+                  <label className="mt-5 block text-sm text-zinc-500">{copy.quickAmount as string}</label>
                   <input
                     autoFocus
                     value={customValue}
@@ -971,14 +1150,14 @@ function App() {
                     className="mt-2 w-full rounded-[24px] border border-white/10 bg-white/[0.06] px-4 py-4 text-3xl font-bold text-white outline-none"
                   />
                   <button onClick={saveCustom} className="mt-5 w-full rounded-full bg-white py-4 text-sm font-bold text-black">
-                    保存快捷数量
+                    {copy.saveQuick as string}
                   </button>
                 </>
               ) : detailType ? (
                 <>
-                  <p className="text-sm text-zinc-500">训练详情</p>
+                  <p className="text-sm text-zinc-500">{copy.details as string}</p>
                   <div className="mt-1 flex items-center justify-between">
-                    <h2 className="text-2xl font-bold text-white">{exerciseMeta[detailType].label}</h2>
+                    <h2 className="text-2xl font-bold text-white">{labelFor(detailType)}</h2>
                     <span
                       className="rounded-full px-3 py-1 text-xs font-bold"
                       style={{
@@ -986,12 +1165,12 @@ function App() {
                         color: exerciseMeta[detailType].color
                       }}
                     >
-                      {exerciseMeta[detailType].kind === 'time' ? '计时' : '次数'}
+                      {exerciseMeta[detailType].kind === 'time' ? copy.timed as string : copy.count as string}
                     </span>
                   </div>
                   <div className="mt-5 grid grid-cols-1 gap-3">
                     <div className="rounded-[24px] bg-white/[0.06] p-4">
-                      <p className="text-xs text-zinc-500">今日</p>
+                      <p className="text-xs text-zinc-500">{copy.today as string}</p>
                       <p className="mt-2 text-3xl font-bold text-white">{formatAmount(detailType, summary[detailType])}</p>
                     </div>
                   </div>
