@@ -40,7 +40,7 @@ const databaseVersion = 1;
 const entryStoreName = 'workout_entries';
 const quickAmountsStorageKey = 'workout-tracker-h5-quick-amounts';
 const themeStorageKey = 'workout-tracker-h5-theme';
-const appVersion = 'v0.1.8';
+const appVersion = 'v0.1.9';
 
 const exerciseMeta: Record<EntryType, ExerciseMeta> = {
   pushups: {
@@ -108,9 +108,9 @@ const formatUnit = (type: EntryType) => (exerciseMeta[type].kind === 'time' ? '�
 const getAmountTextClass = (type: EntryType, amount: number) => {
   const text = formatAmount(type, amount);
   if (type === 'plank' || type === 'handstand') {
-    return text.length > 5 ? 'text-[18px]' : 'text-[21px]';
+    return text.length > 5 ? 'text-[16px]' : 'text-[18px]';
   }
-  return text.length > 3 ? 'text-[19px]' : 'text-[23px]';
+  return text.length > 3 ? 'text-[17px]' : 'text-[20px]';
 };
 
 const getBestTextClass = (type: EntryType, amount: number) => {
@@ -139,6 +139,32 @@ const loadTheme = (): Theme => {
   } catch {
     return 'dark';
   }
+};
+
+const NavIcon = ({ type }: { type: Tab }) => {
+  if (type === 'today') {
+    return (
+      <svg viewBox="0 0 24 24" className="h-[21px] w-[21px]" fill="none" aria-hidden="true">
+        <path d="M4 10.5L12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+
+  if (type === 'trends') {
+    return (
+      <svg viewBox="0 0 24 24" className="h-[21px] w-[21px]" fill="none" aria-hidden="true">
+        <path d="M5 19V9M12 19V5M19 19v-7" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+        <path d="M4 19.5h16" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" opacity="0.55" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" className="h-[21px] w-[21px]" fill="none" aria-hidden="true">
+      <path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M19.4 13.5a7.8 7.8 0 0 0 0-3l2-1.5-2-3.5-2.4 1a8 8 0 0 0-2.6-1.5L14 2.5h-4L9.6 5a8 8 0 0 0-2.6 1.5l-2.4-1-2 3.5 2 1.5a7.8 7.8 0 0 0 0 3l-2 1.5 2 3.5 2.4-1a8 8 0 0 0 2.6 1.5l.4 2.5h4l.4-2.5a8 8 0 0 0 2.6-1.5l2.4 1 2-3.5-2-1.5Z" stroke="currentColor" strokeWidth="1.35" strokeLinejoin="round" opacity="0.9" />
+    </svg>
+  );
 };
 
 const ExerciseIcon = ({ type }: { type: EntryType }) => {
@@ -552,18 +578,18 @@ function App() {
   const renderToday = () => (
     <>
       <header className="px-4 pb-4 pt-4">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex items-end justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-600">Workout</p>
-            <h1 className="mt-1 text-[31px] font-bold leading-none tracking-normal text-white">今日训练</h1>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-600">Workout</p>
+            <h1 className="mt-1 text-[29px] font-bold leading-none tracking-normal text-white">今日训练</h1>
             <p className="mt-2 text-[13px] font-medium leading-none text-zinc-500">
               {new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' })}
             </p>
           </div>
-          <div className="shrink-0 rounded-[22px] border border-white/10 bg-white/[0.05] px-3.5 py-3 text-right shadow-lg shadow-black/20">
+          <div className="shrink-0 pb-0.5 text-right">
             <p className="text-[10px] font-semibold leading-none text-zinc-500">训练天数</p>
-            <p className="mt-1.5 text-[28px] font-bold leading-none text-orange-300 tabular-nums">{trainingDays}</p>
-            <p className="mt-1 text-[10px] font-semibold leading-none text-zinc-600">连续 {streakDays} 天</p>
+            <p className="mt-1 text-[21px] font-bold leading-none text-orange-300 tabular-nums">{trainingDays}天</p>
+            <p className="mt-1 text-[10px] font-medium leading-none text-zinc-600">连续 {streakDays} 天</p>
           </div>
         </div>
       </header>
@@ -576,21 +602,21 @@ function App() {
               layout
               key={type}
               onClick={() => setDetailType(type)}
-              className={`min-w-0 overflow-hidden rounded-[18px] bg-zinc-900/90 px-2 py-3.5 text-center shadow-2xl ${meta.glow}`}
+              className={`min-w-0 overflow-hidden rounded-[18px] bg-zinc-900/90 px-2 py-3 text-center shadow-xl ${meta.glow}`}
               whileTap={{ scale: 0.98 }}
             >
               <div
-                className="mx-auto mb-2.5 flex h-9 w-9 items-center justify-center rounded-2xl [&_svg]:h-7 [&_svg]:w-7"
+                className="mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-[14px] [&_svg]:h-6 [&_svg]:w-6"
                 style={{ backgroundColor: `${meta.color}22`, color: meta.color }}
               >
                 <ExerciseIcon type={type} />
               </div>
-              <p className="h-8 overflow-hidden text-[11px] font-semibold leading-4 text-zinc-300">{meta.label}</p>
-              <p className={`mt-1.5 truncate font-bold leading-none text-white ${getAmountTextClass(type, summary[type])}`}>
+              <p className="h-7 overflow-hidden text-[10px] font-semibold leading-[14px] text-zinc-300">{meta.label}</p>
+              <p className={`mt-1 truncate font-bold leading-none text-white tabular-nums ${getAmountTextClass(type, summary[type])}`}>
                 {formatAmount(type, summary[type])}
               </p>
-              <p className="mt-1.5 text-[11px] leading-none text-zinc-400">{formatUnit(type)}</p>
-              <p className={`mx-auto mt-2 max-w-full break-words text-zinc-500 ${getBestTextClass(type, bestSummary[type])}`}>
+              <p className="mt-1 text-[10px] leading-none text-zinc-400">{formatUnit(type)}</p>
+              <p className={`mx-auto mt-1.5 max-w-full break-words text-zinc-500 ${getBestTextClass(type, bestSummary[type])}`}>
                 最佳 {formatAmount(type, bestSummary[type])} {formatUnit(type)}
               </p>
             </motion.button>
@@ -600,8 +626,8 @@ function App() {
 
       <section className="mt-6 px-4">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-[19px] font-bold leading-none text-white">快捷记录</h2>
-          <span className="rounded-full bg-white/[0.06] px-3 py-1 text-[11px] font-semibold text-zinc-500">长按自定义</span>
+          <h2 className="text-[18px] font-bold leading-none text-white">快捷记录</h2>
+          <span className="rounded-full bg-white/[0.06] px-2.5 py-1 text-[10px] font-semibold text-zinc-500">长按自定义</span>
         </div>
         <div className="grid grid-cols-2 gap-3">
           {countTypes.map((type) => {
@@ -609,18 +635,18 @@ function App() {
             return (
               <div
                 key={type}
-                className="rounded-[22px] border border-white/5 bg-zinc-900/80 p-3.5 shadow-xl shadow-black/20"
+                className="rounded-[20px] border border-white/5 bg-zinc-900/80 p-3 shadow-lg shadow-black/15"
                 style={{ boxShadow: `inset 0 0 34px ${meta.color}10` }}
               >
                 <div className="flex items-center gap-2">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-[14px] [&_svg]:h-7 [&_svg]:w-7" style={{ backgroundColor: `${meta.color}18` }}>
+                  <span className="flex h-8 w-8 items-center justify-center rounded-[13px] [&_svg]:h-6 [&_svg]:w-6" style={{ backgroundColor: `${meta.color}18` }}>
                     <ExerciseIcon type={type} />
                   </span>
                   <div className="min-w-0">
-                    <p className="truncate text-[13px] font-bold leading-none" style={{ color: meta.color }}>
+                    <p className="truncate text-[12px] font-bold leading-none" style={{ color: meta.color }}>
                       {meta.label}
                     </p>
-                    <p className="mt-1 text-[10px] font-medium leading-none text-zinc-600">快速增加</p>
+                    <p className="mt-1 text-[9px] font-medium leading-none text-zinc-600">快速增加</p>
                   </div>
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2">
@@ -632,10 +658,10 @@ function App() {
                       onPointerUp={() => endQuickStep(type, step)}
                       onPointerCancel={() => window.clearTimeout(pressTimer.current ?? undefined)}
                       onContextMenu={(event) => event.preventDefault()}
-                      className="h-12 rounded-[17px] border border-white/10 bg-white/[0.055] px-2 text-center shadow-inner shadow-white/5"
+                      className="h-10 rounded-[15px] border border-white/10 bg-white/[0.055] px-2 text-center shadow-inner shadow-white/5"
                     >
-                      <span className="text-[12px] font-semibold text-zinc-500">+</span>
-                      <span className="ml-0.5 text-[19px] font-bold leading-none text-white tabular-nums">
+                      <span className="text-[10px] font-semibold text-zinc-500">+</span>
+                      <span className="ml-0.5 text-[16px] font-bold leading-none text-white tabular-nums">
                         {meta.kind === 'time' ? formatDuration(step) : step}
                       </span>
                     </motion.button>
@@ -650,18 +676,18 @@ function App() {
             return (
               <div
                 key={type}
-                className="rounded-[22px] border border-white/5 bg-zinc-900/80 p-3.5 shadow-xl shadow-black/20"
+                className="rounded-[20px] border border-white/5 bg-zinc-900/80 p-3 shadow-lg shadow-black/15"
                 style={{ boxShadow: `inset 0 0 30px ${meta.color}18` }}
               >
                 <div className="flex items-center gap-2">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-[14px] [&_svg]:h-7 [&_svg]:w-7" style={{ backgroundColor: `${meta.color}18` }}>
+                  <span className="flex h-8 w-8 items-center justify-center rounded-[13px] [&_svg]:h-6 [&_svg]:w-6" style={{ backgroundColor: `${meta.color}18` }}>
                     <ExerciseIcon type={type} />
                   </span>
                   <div className="min-w-0">
-                    <p className="truncate text-[13px] font-bold leading-none" style={{ color: meta.color }}>
+                    <p className="truncate text-[12px] font-bold leading-none" style={{ color: meta.color }}>
                       {meta.label}
                     </p>
-                    <p className="mt-1 text-[10px] font-medium leading-none text-zinc-600">计时训练</p>
+                    <p className="mt-1 text-[9px] font-medium leading-none text-zinc-600">计时训练</p>
                   </div>
                 </div>
                 <div className="mt-3 grid grid-cols-[1fr_auto] gap-2">
@@ -676,7 +702,7 @@ function App() {
                       }
                       setTimerRunning((value) => !value);
                     }}
-                    className="h-12 rounded-[17px] border px-3 text-left text-[14px] font-bold tabular-nums"
+                    className="h-10 rounded-[15px] border px-3 text-left text-[12px] font-bold tabular-nums"
                     style={{ borderColor: `${meta.color}90`, color: meta.color }}
                   >
                     {isActiveTimer && timerSeconds > 0 ? formatDuration(timerSeconds) : '开始计时'}
@@ -690,7 +716,7 @@ function App() {
                       }
                       saveTimer();
                     }}
-                    className="h-12 w-12 rounded-[17px] border text-[11px] font-bold"
+                    className="h-10 w-10 rounded-[15px] border text-[10px] font-bold"
                     style={{ borderColor: `${meta.color}90`, color: meta.color }}
                   >
                     保存
@@ -705,8 +731,8 @@ function App() {
       <section className="mt-4 px-4 pb-28">
         <div className="rounded-[28px] border border-white/10 bg-zinc-950/70 p-4">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-[19px] font-bold leading-none text-white">最近记录</h2>
-            <span className="rounded-full bg-white/[0.06] px-3 py-1 text-[11px] font-semibold text-zinc-500">{logs.length} 条</span>
+            <h2 className="text-[18px] font-bold leading-none text-white">最近记录</h2>
+            <span className="rounded-full bg-white/[0.06] px-2.5 py-1 text-[10px] font-semibold text-zinc-500">{logs.length} 条</span>
           </div>
           <div className="space-y-1">
             {logs.length === 0 ? (
@@ -719,7 +745,7 @@ function App() {
               >
                 <button onClick={() => setDetailType(entry.type)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
                   <span
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] [&_svg]:h-7 [&_svg]:w-7"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[13px] [&_svg]:h-6 [&_svg]:w-6"
                     style={{
                       backgroundColor: `${exerciseMeta[entry.type].color}22`,
                       color: exerciseMeta[entry.type].color
@@ -728,17 +754,17 @@ function App() {
                     <ExerciseIcon type={entry.type} />
                   </span>
                   <div>
-                    <p className="text-[14px] font-semibold leading-none text-white">{exerciseMeta[entry.type].label}</p>
-                    <p className="mt-1.5 text-[11px] font-medium leading-none text-zinc-500">
+                    <p className="text-[13px] font-semibold leading-none text-white">{exerciseMeta[entry.type].label}</p>
+                    <p className="mt-1.5 text-[10px] font-medium leading-none text-zinc-500">
                       {new Date(entry.createdAt).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })}{' '}
                       {new Date(entry.createdAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
                 </button>
                 <div className="flex shrink-0 items-center gap-2.5">
-                  <p className="min-w-[58px] text-right text-[17px] font-bold leading-none text-white tabular-nums">
+                  <p className="min-w-[54px] text-right text-[14px] font-bold leading-none text-white tabular-nums">
                     +{formatAmount(entry.type, entry.amount)}
-                    <span className="ml-1 text-[11px] font-semibold text-zinc-500">{formatUnit(entry.type)}</span>
+                    <span className="ml-1 text-[10px] font-semibold text-zinc-500">{formatUnit(entry.type)}</span>
                   </p>
                   <button
                     onClick={() => deleteRecord(entry.id)}
@@ -969,18 +995,18 @@ function App() {
       <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-black/80 backdrop-blur-2xl">
         <div className="mx-auto flex max-w-md items-center justify-around px-6 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-3">
           {[
-            { key: 'today' as Tab, label: 'Today', mark: '●' },
-            { key: 'trends' as Tab, label: 'Trends', mark: '⌁' },
-            { key: 'settings' as Tab, label: 'Settings', mark: '○' }
+            { key: 'today' as Tab, label: 'Today' },
+            { key: 'trends' as Tab, label: 'Trends' },
+            { key: 'settings' as Tab, label: 'Settings' }
           ].map((item) => (
             <button
               key={item.key}
               onClick={() => setActiveTab(item.key)}
-              className={`flex min-w-20 flex-col items-center gap-1 text-xs font-semibold ${
+              className={`flex min-w-20 flex-col items-center gap-1 text-[11px] font-semibold ${
                 activeTab === item.key ? 'text-blue-400' : 'text-zinc-600'
               }`}
             >
-              <span className="text-lg leading-none">{item.mark}</span>
+              <NavIcon type={item.key} />
               {item.label}
             </button>
           ))}
