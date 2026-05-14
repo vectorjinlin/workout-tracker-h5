@@ -43,7 +43,7 @@ const entryStoreName = 'workout_entries';
 const quickAmountsStorageKey = 'workout-tracker-h5-quick-amounts';
 const themeStorageKey = 'workout-tracker-h5-theme';
 const languageStorageKey = 'workout-tracker-h5-language';
-const appVersion = 'v0.2.4';
+const appVersion = 'v0.2.5';
 
 const text = {
   zh: {
@@ -55,7 +55,6 @@ const text = {
     quickLog: '快捷记录',
     longPress: '长按自定义',
     quickAdd: '快速增加',
-    addAction: '加',
     timedTraining: '计时训练',
     startTimer: '开始计时',
     save: '保存',
@@ -111,7 +110,6 @@ const text = {
     quickLog: 'Quick Log',
     longPress: 'Long press',
     quickAdd: 'Quick add',
-    addAction: 'Add',
     timedTraining: 'Timer',
     startTimer: 'Start',
     save: 'Save',
@@ -539,6 +537,11 @@ function App() {
   const longPressFired = useRef(false);
   const toastTimer = useRef<number | null>(null);
 
+  function switchTab(tab: Tab) {
+    setActiveTab(tab);
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }
+
   useEffect(() => {
     let ignore = false;
 
@@ -815,8 +818,8 @@ function App() {
                       className="flex h-10 items-center justify-center rounded-[15px] border border-white/10 bg-white/[0.055] px-2 text-center"
                       style={{ color: meta.color }}
                     >
-                      <span className="translate-y-[-1px] text-[10px] font-semibold leading-none opacity-75">{copy.addAction as string}</span>
-                      <span className="ml-1 text-[16px] font-bold leading-none tabular-nums">
+                      <span className="translate-y-[-1px] text-[11px] font-semibold leading-none opacity-75">+</span>
+                      <span className="ml-0.5 text-[16px] font-bold leading-none tabular-nums">
                         {meta.kind === 'time' ? formatDuration(step) : step}
                       </span>
                     </motion.button>
@@ -868,11 +871,6 @@ function App() {
                     >
                       {isActiveTimer && timerSeconds > 0 ? formatDuration(timerSeconds) : copy.startTimer as string}
                     </span>
-                    {isActiveTimer && timerSeconds > 0 ? (
-                      <span className="absolute right-3 text-[10px] font-bold leading-none opacity-70" style={{ color: meta.color }}>
-                        {copy.saveTimer as string}
-                      </span>
-                    ) : null}
                   </motion.button>
                 </div>
               </div>
@@ -1190,7 +1188,7 @@ function App() {
           ].map((item) => (
             <button
               key={item.key}
-              onClick={() => setActiveTab(item.key)}
+              onClick={() => switchTab(item.key)}
               className={`flex min-w-20 flex-col items-center gap-1 text-[11px] font-semibold ${
                 activeTab === item.key ? 'text-blue-400' : 'text-zinc-600'
               }`}
