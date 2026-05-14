@@ -12,6 +12,7 @@ import {
 
 type EntryType = 'pushups' | 'pullups' | 'plank' | 'handstand';
 type Tab = 'today' | 'trends' | 'settings';
+type Theme = 'dark' | 'light';
 type QuickTarget = {
   index: number;
   type: Extract<EntryType, 'pushups' | 'pullups'>;
@@ -38,7 +39,8 @@ const databaseName = 'workout-tracker-h5';
 const databaseVersion = 1;
 const entryStoreName = 'workout_entries';
 const quickAmountsStorageKey = 'workout-tracker-h5-quick-amounts';
-const appVersion = 'v0.1.6';
+const themeStorageKey = 'workout-tracker-h5-theme';
+const appVersion = 'v0.1.7';
 
 const exerciseMeta: Record<EntryType, ExerciseMeta> = {
   pushups: {
@@ -128,6 +130,14 @@ const loadQuickAmounts = () => {
     };
   } catch {
     return defaultQuickAmounts;
+  }
+};
+
+const loadTheme = (): Theme => {
+  try {
+    return localStorage.getItem(themeStorageKey) === 'light' ? 'light' : 'dark';
+  } catch {
+    return 'dark';
   }
 };
 
@@ -329,9 +339,10 @@ const createRandomHistoryEntries = () => {
 function App() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [activeTab, setActiveTab] = useState<Tab>('today');
-  const [toast, setToast] = useState<{ text: string; id?: string } | null>(null);
+  const [toast, setToast] = useState<{ text: string } | null>(null);
   const [detailType, setDetailType] = useState<EntryType | null>(null);
   const [quickTarget, setQuickTarget] = useState<QuickTarget | null>(null);
+  const [theme, setTheme] = useState<Theme>(() => loadTheme());
   const [quickAmounts, setQuickAmounts] = useState(defaultQuickAmounts);
   const [customValue, setCustomValue] = useState('');
   const [timerType, setTimerType] = useState<EntryType>('plank');
@@ -363,6 +374,11 @@ function App() {
   useEffect(() => {
     localStorage.setItem(quickAmountsStorageKey, JSON.stringify(quickAmounts));
   }, [quickAmounts]);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem(themeStorageKey, theme);
+  }, [theme]);
 
   useEffect(() => {
     if (!timerRunning) return undefined;
@@ -441,26 +457,10 @@ function App() {
   const totalMinutes = Math.round((summary.plank + summary.handstand) / 60);
   const totalReps = summary.pushups + summary.pullups;
 
-  function showUndoToast(entry: Entry) {
-    window.clearTimeout(toastTimer.current ?? undefined);
-    setToast({
-      id: entry.id,
-      text: `${exerciseMeta[entry.type].label} +${formatAmount(entry.type, entry.amount)} ${formatUnit(entry.type)}`
-    });
-    toastTimer.current = window.setTimeout(() => setToast(null), 3600);
-  }
-
   async function addRecord(type: EntryType, amount: number) {
     const entry = { id: `${Date.now()}-${type}`, date: today, type, amount, createdAt: Date.now() };
     await saveEntryToDatabase(entry);
     setEntries((current) => [entry, ...current]);
-    showUndoToast(entry);
-  }
-
-  async function undoRecord(id: string) {
-    await deleteEntryFromDatabase(id);
-    setEntries((current) => current.filter((entry) => entry.id !== id));
-    setToast(null);
   }
 
   async function deleteRecord(id: string) {
@@ -797,12 +797,26 @@ function App() {
     <div className="px-5 pb-28 pt-7">
       <h1 className="text-center text-xl font-bold text-white">设置</h1>
       <div className="mt-6 space-y-3">
-        {['深色模式已开启', '数据保存在本机 IndexedDB，手机访问时即存于手机本地', '长按快捷按钮可自定义数量', '保存计时后可立即撤销'].map((item) => (
+        {[
+          `当前外观：${theme === 'dark' ? '深色模式' : '浅色模式'}`,
+          '数据保存在本机 IndexedDB，手机访问时即存于手机本地',
+          '长按快捷按钮可自定义数量',
+          '保存计时后会写入最近记录'
+        ].map((item) => (
           <div key={item} className="rounded-[24px] bg-zinc-900 px-4 py-4 text-sm font-medium text-zinc-300">
             {item}
           </div>
         ))}
       </div>
+      <button
+        onClick={() => setTheme((value) => (value === 'dark' ? 'light' : 'dark'))}
+        className="mt-5 flex w-full items-center justify-between rounded-full border border-white/10 bg-white/[0.06] px-5 py-4 text-sm font-bold text-white"
+      >
+        <span>外观模式</span>
+        <span className="rounded-full bg-white px-4 py-2 text-xs text-black">
+          {theme === 'dark' ? '切换浅色' : '切换深色'}
+        </span>
+      </button>
       <button
         onClick={generateRandomHistory}
         className="mt-5 w-full rounded-full border border-white/10 bg-white/[0.06] px-5 py-4 text-sm font-bold text-white"
@@ -827,8 +841,10 @@ function App() {
     </div>
   );
 
+  const isLightTheme = theme === 'light';
+
   return (
-    <div className="min-h-[100dvh] bg-black text-white">
+    <div className={`min-h-[100dvh] bg-black text-white ${isLightTheme ? 'theme-light' : 'theme-dark'}`}>
       <main className="mx-auto min-h-[100dvh] max-w-md bg-[radial-gradient(circle_at_50%_-10%,rgba(80,80,80,0.34),transparent_36%),#050505]">
         <AnimatePresence mode="wait">
           <motion.div
@@ -855,11 +871,6 @@ function App() {
           >
             <div className="flex items-center justify-between gap-4">
               <p className="text-sm font-semibold text-white">{toast.text}</p>
-              {toast.id ? (
-                <button onClick={() => undoRecord(toast.id!)} className="rounded-full bg-white px-4 py-2 text-xs font-bold text-black">
-                  撤销
-                </button>
-              ) : null}
             </div>
           </motion.div>
         )}
@@ -868,7 +879,7 @@ function App() {
       <AnimatePresence>
         {(detailType || quickTarget) && (
           <motion.div
-            className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+            className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
