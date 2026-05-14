@@ -105,9 +105,15 @@ const formatUnit = (type: EntryType) => (exerciseMeta[type].kind === 'time' ? '�
 const getAmountTextClass = (type: EntryType, amount: number) => {
   const text = formatAmount(type, amount);
   if (type === 'plank' || type === 'handstand') {
-    return text.length > 5 ? 'text-[21px]' : 'text-[24px]';
+    return text.length > 5 ? 'text-[18px]' : 'text-[21px]';
   }
-  return text.length > 3 ? 'text-[21px]' : 'text-[25px]';
+  return text.length > 3 ? 'text-[19px]' : 'text-[23px]';
+};
+
+const getBestTextClass = (type: EntryType, amount: number) => {
+  const text = `最佳 ${formatAmount(type, amount)} ${formatUnit(type)}`;
+  if (text.length > 10) return 'text-[9px] leading-[12px]';
+  return 'text-[10px] leading-[13px]';
 };
 
 const loadQuickAmounts = () => {
@@ -544,7 +550,7 @@ function App() {
 
   const renderToday = () => (
     <>
-      <header className="px-4 pb-4 pt-6">
+      <header className="px-4 pb-4 pt-3">
         <div className="flex items-start justify-between gap-5">
           <div>
             <h1 className="text-[32px] font-bold leading-none tracking-normal text-white">今日训练</h1>
@@ -568,21 +574,21 @@ function App() {
               layout
               key={type}
               onClick={() => setDetailType(type)}
-              className={`min-h-[146px] rounded-[18px] bg-zinc-900/90 px-2.5 py-4 text-center shadow-2xl ${meta.glow}`}
+              className={`min-w-0 overflow-hidden rounded-[18px] bg-zinc-900/90 px-2 py-3.5 text-center shadow-2xl ${meta.glow}`}
               whileTap={{ scale: 0.98 }}
             >
               <div
-                className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-2xl"
+                className="mx-auto mb-2.5 flex h-9 w-9 items-center justify-center rounded-2xl [&_svg]:h-7 [&_svg]:w-7"
                 style={{ backgroundColor: `${meta.color}22`, color: meta.color }}
               >
                 <ExerciseIcon type={type} />
               </div>
-              <p className="h-8 text-[12px] font-semibold leading-4 text-zinc-300">{meta.label}</p>
-              <p className={`mt-2 font-bold leading-none text-white ${getAmountTextClass(type, summary[type])}`}>
+              <p className="h-8 overflow-hidden text-[11px] font-semibold leading-4 text-zinc-300">{meta.label}</p>
+              <p className={`mt-1.5 truncate font-bold leading-none text-white ${getAmountTextClass(type, summary[type])}`}>
                 {formatAmount(type, summary[type])}
               </p>
-              <p className="mt-2 text-xs text-zinc-400">{formatUnit(type)}</p>
-              <p className="mt-3 whitespace-nowrap text-[10px] text-zinc-500">
+              <p className="mt-1.5 text-[11px] leading-none text-zinc-400">{formatUnit(type)}</p>
+              <p className={`mx-auto mt-2 max-w-full break-words text-zinc-500 ${getBestTextClass(type, bestSummary[type])}`}>
                 最佳 {formatAmount(type, bestSummary[type])} {formatUnit(type)}
               </p>
             </motion.button>
@@ -820,8 +826,8 @@ function App() {
   );
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <main className="mx-auto min-h-screen max-w-md bg-[radial-gradient(circle_at_50%_-10%,rgba(80,80,80,0.34),transparent_36%),#050505]">
+    <div className="min-h-[100dvh] bg-black text-white">
+      <main className="mx-auto min-h-[100dvh] max-w-md bg-[radial-gradient(circle_at_50%_-10%,rgba(80,80,80,0.34),transparent_36%),#050505]">
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
