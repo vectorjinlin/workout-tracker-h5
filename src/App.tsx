@@ -43,7 +43,7 @@ const entryStoreName = 'workout_entries';
 const quickAmountsStorageKey = 'workout-tracker-h5-quick-amounts';
 const themeStorageKey = 'workout-tracker-h5-theme';
 const languageStorageKey = 'workout-tracker-h5-language';
-const appVersion = 'v0.2.3';
+const appVersion = 'v0.2.4';
 
 const text = {
   zh: {
@@ -55,6 +55,7 @@ const text = {
     quickLog: '快捷记录',
     longPress: '长按自定义',
     quickAdd: '快速增加',
+    addAction: '加',
     timedTraining: '计时训练',
     startTimer: '开始计时',
     save: '保存',
@@ -110,6 +111,7 @@ const text = {
     quickLog: 'Quick Log',
     longPress: 'Long press',
     quickAdd: 'Quick add',
+    addAction: 'Add',
     timedTraining: 'Timer',
     startTimer: 'Start',
     save: 'Save',
@@ -811,9 +813,10 @@ function App() {
                       onPointerCancel={() => window.clearTimeout(pressTimer.current ?? undefined)}
                       onContextMenu={(event) => event.preventDefault()}
                       className="flex h-10 items-center justify-center rounded-[15px] border border-white/10 bg-white/[0.055] px-2 text-center"
+                      style={{ color: meta.color }}
                     >
-                      <span className="translate-y-[-1px] text-[10px] font-semibold leading-none text-zinc-500">+</span>
-                      <span className="ml-0.5 text-[16px] font-bold leading-none text-white tabular-nums">
+                      <span className="translate-y-[-1px] text-[10px] font-semibold leading-none opacity-75">{copy.addAction as string}</span>
+                      <span className="ml-1 text-[16px] font-bold leading-none tabular-nums">
                         {meta.kind === 'time' ? formatDuration(step) : step}
                       </span>
                     </motion.button>
