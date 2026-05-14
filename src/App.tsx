@@ -240,6 +240,31 @@ const clearEntriesFromDatabase = async () => {
   }
 };
 
+const deleteEntriesByDateFromDatabase = async (date: string) => {
+  const db = await openWorkoutDatabase();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction(entryStoreName, 'readwrite');
+      const store = transaction.objectStore(entryStoreName);
+      const dateIndex = store.index('date');
+      const request = dateIndex.openCursor(IDBKeyRange.only(date));
+
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (!cursor) return;
+        cursor.delete();
+        cursor.continue();
+      };
+      request.onerror = () => reject(request.error);
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error);
+    });
+  } finally {
+    db.close();
+  }
+};
+
 const saveEntriesToDatabase = async (entries: Entry[]) => {
   if (entries.length === 0) return;
 
@@ -438,11 +463,29 @@ function App() {
   }
 
   async function clearAllRecords() {
-    const confirmed = window.confirm('确定清空这台设备上的所有训练数据吗？此操作不可撤销。');
+    const confirmed = window.confirm('确定初始化数据吗？这会清空这台设备上的所有训练数据，此操作不可撤销。');
     if (!confirmed) return;
     await clearEntriesFromDatabase();
     setEntries([]);
     setToast(null);
+  }
+
+  async function clearTodayRecords() {
+    const todayRecordCount = todayEntries.length;
+    if (todayRecordCount === 0) {
+      setToast({ text: '今天还没有训练数据' });
+      window.clearTimeout(toastTimer.current ?? undefined);
+      toastTimer.current = window.setTimeout(() => setToast(null), 2400);
+      return;
+    }
+
+    const confirmed = window.confirm(`确定清除今天的 ${todayRecordCount} 条训练数据吗？历史数据不会受影响。`);
+    if (!confirmed) return;
+    await deleteEntriesByDateFromDatabase(today);
+    setEntries((current) => current.filter((entry) => entry.date !== today));
+    setToast({ text: '已清除当天数据' });
+    window.clearTimeout(toastTimer.current ?? undefined);
+    toastTimer.current = window.setTimeout(() => setToast(null), 2400);
   }
 
   async function generateRandomHistory() {
@@ -754,17 +797,25 @@ function App() {
         ))}
       </div>
       <button
-        onClick={clearAllRecords}
-        className="mt-5 w-full rounded-full bg-white px-5 py-4 text-sm font-bold text-black"
-      >
-        一键清空所有数据
-      </button>
-      <button
         onClick={generateRandomHistory}
-        className="mt-3 w-full rounded-full border border-white/10 bg-white/[0.06] px-5 py-4 text-sm font-bold text-white"
+        className="mt-5 w-full rounded-full border border-white/10 bg-white/[0.06] px-5 py-4 text-sm font-bold text-white"
       >
         随机生成 15-60 天测试数据
       </button>
+      <div className="mt-8 space-y-3">
+        <button
+          onClick={clearTodayRecords}
+          className="w-full rounded-full border border-white/10 bg-white/[0.06] px-5 py-4 text-sm font-bold text-white"
+        >
+          清除当天数据
+        </button>
+        <button
+          onClick={clearAllRecords}
+          className="w-full rounded-full bg-white px-5 py-4 text-sm font-bold text-black"
+        >
+          初始化数据
+        </button>
+      </div>
     </div>
   );
 
