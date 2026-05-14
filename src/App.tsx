@@ -43,7 +43,7 @@ const entryStoreName = 'workout_entries';
 const quickAmountsStorageKey = 'workout-tracker-h5-quick-amounts';
 const themeStorageKey = 'workout-tracker-h5-theme';
 const languageStorageKey = 'workout-tracker-h5-language';
-const appVersion = 'v0.2.1';
+const appVersion = 'v0.2.2';
 
 const text = {
   zh: {
@@ -58,7 +58,7 @@ const text = {
     timedTraining: '计时训练',
     startTimer: '开始计时',
     save: '保存',
-    saveTimer: '保存',
+    saveTimer: '完成',
     recentLogs: '最近记录',
     emptyLogs: '暂无记录',
     delete: '删除',
@@ -113,7 +113,7 @@ const text = {
     timedTraining: 'Timer',
     startTimer: 'Start',
     save: 'Save',
-    saveTimer: 'Save',
+    saveTimer: 'Done',
     recentLogs: 'Recent Logs',
     emptyLogs: 'No records',
     delete: 'Delete',
@@ -841,39 +841,35 @@ function App() {
                     <p className="mt-1 text-[9px] font-medium leading-none text-zinc-600">{copy.timedTraining as string}</p>
                   </div>
                 </div>
-                <div className="mt-3 grid grid-cols-1 gap-2">
+                <div className={isActiveTimer && timerSeconds > 0 ? 'mt-3 grid grid-cols-[1fr_auto] gap-2' : 'mt-3 grid grid-cols-1 gap-2'}>
                   <motion.button
                     whileTap={{ scale: 0.96 }}
                     onClick={() => {
                       if (!isActiveTimer) {
                         setTimerType(type);
                         setTimerSeconds(0);
-                        setTimerRunning(true);
-                        return;
-                      }
-                      if (timerSeconds > 0) {
-                        saveTimer();
-                        return;
                       }
                       setTimerRunning(true);
                     }}
                     className="flex h-10 items-center justify-center rounded-[15px] border border-white/10 bg-white/[0.055] px-2 text-center"
                   >
-                    {isActiveTimer && timerSeconds > 0 ? (
-                      <>
-                        <span className="mr-1 text-[10px] font-semibold leading-none" style={{ color: meta.color }}>
-                          {copy.saveTimer as string}
-                        </span>
-                        <span className="text-[16px] font-bold leading-none tabular-nums" style={{ color: meta.color }}>
-                          {formatDuration(timerSeconds)}
-                        </span>
-                      </>
-                    ) : (
-                      <span className="text-[13px] font-bold leading-none" style={{ color: meta.color }}>
-                        {copy.startTimer as string}
-                      </span>
-                    )}
+                    <span
+                      className={`${isActiveTimer && timerSeconds > 0 ? 'text-[16px]' : 'text-[13px]'} font-bold leading-none tabular-nums`}
+                      style={{ color: meta.color }}
+                    >
+                      {isActiveTimer && timerSeconds > 0 ? formatDuration(timerSeconds) : copy.startTimer as string}
+                    </span>
                   </motion.button>
+                  {isActiveTimer && timerSeconds > 0 ? (
+                    <motion.button
+                      whileTap={{ scale: 0.96 }}
+                      onClick={saveTimer}
+                      className="flex h-10 min-w-12 items-center justify-center rounded-[15px] border border-white/10 bg-white/[0.035] px-3 text-[11px] font-bold"
+                      style={{ color: meta.color }}
+                    >
+                      {copy.saveTimer as string}
+                    </motion.button>
+                  ) : null}
                 </div>
               </div>
             );
