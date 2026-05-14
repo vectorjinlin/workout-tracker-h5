@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="947 daily workout">
+  <defs>
+    <linearGradient id="bg" x1="96" y1="64" x2="416" y2="448" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#111827"/>
+      <stop offset="0.55" stop-color="#050505"/>
+      <stop offset="1" stop-color="#1f2937"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="140" y1="150" x2="370" y2="366" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4f7cff"/>
+      <stop offset="0.48" stop-color="#45d67b"/>
+      <stop offset="1" stop-color="#ff9f2f"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0.31 0 0 0 0 0.49 0 0 0 0 1 0 0 0 0.5 0"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="190" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="2"/>
+  <path d="M132 286h50l26-58 52 116 45-156 24 98h51" fill="none" stroke="url(#accent)" stroke-width="24" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+  <g fill="none" stroke="#f8fafc" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" opacity="0.94">
+    <path d="M130 180h62"/>
+    <path d="M320 180h62"/>
+    <path d="M192 154v52"/>
+    <path d="M320 154v52"/>
+    <path d="M216 180h80"/>
+  </g>
+  <text x="256" y="394" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="76" font-weight="800" fill="#ffffff" letter-spacing="2">947</text>
+</svg>

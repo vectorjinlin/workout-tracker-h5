@@ -43,7 +43,7 @@ const entryStoreName = 'workout_entries';
 const quickAmountsStorageKey = 'workout-tracker-h5-quick-amounts';
 const themeStorageKey = 'workout-tracker-h5-theme';
 const languageStorageKey = 'workout-tracker-h5-language';
-const appVersion = 'v0.2.5';
+const appVersion = 'v0.2.6';
 
 const text = {
   zh: {
