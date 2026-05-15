@@ -235,6 +235,13 @@ const toTrendPercent = (value: number, best: number) => (best > 0 ? Math.round((
 
 const formatTrendPercent = (value: number | string) => `${Math.round(Number(value) || 0)}%`;
 
+const trendRawKey = (type: EntryType) => `${type}Raw`;
+
+const appBackground: Record<Theme, string> = {
+  dark: '#050505',
+  light: '#f6f8fc'
+};
+
 const getAmountTextClass = (type: EntryType, amount: number) => {
   const text = formatAmount(type, amount);
   if (type === 'plank' || type === 'handstand') {
@@ -581,6 +588,9 @@ function App() {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
+    document.documentElement.style.backgroundColor = appBackground[theme];
+    document.body.style.backgroundColor = appBackground[theme];
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', appBackground[theme]);
     localStorage.setItem(themeStorageKey, theme);
   }, [theme]);
 
@@ -662,7 +672,11 @@ function App() {
         pushups: toTrendPercent(daySummary.pushups, trendBests.pushups),
         pullups: toTrendPercent(daySummary.pullups, trendBests.pullups),
         plank: toTrendPercent(daySummary.plank, trendBests.plank),
-        handstand: toTrendPercent(daySummary.handstand, trendBests.handstand)
+        handstand: toTrendPercent(daySummary.handstand, trendBests.handstand),
+        [trendRawKey('pushups')]: daySummary.pushups,
+        [trendRawKey('pullups')]: daySummary.pullups,
+        [trendRawKey('plank')]: daySummary.plank,
+        [trendRawKey('handstand')]: daySummary.handstand
       };
     });
   }, [dailySummaries, trendBests, trendRange]);
@@ -1008,7 +1022,7 @@ function App() {
         </div>
         <div className="mt-5 h-72">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={trendData} margin={{ top: 8, right: 6, left: -28, bottom: 0 }}>
+            <LineChart data={trendData} margin={{ top: 8, right: 8, left: 4, bottom: 0 }}>
               <CartesianGrid stroke={isLightTheme ? 'rgba(15,23,42,0.08)' : 'rgba(255,255,255,0.07)'} vertical={false} />
               <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: isLightTheme ? '#64748b' : '#71717a', fontSize: 11, fontWeight: 600 }} />
               <YAxis
@@ -1017,11 +1031,17 @@ function App() {
                 domain={[0, 100]}
                 ticks={[0, 25, 50, 75, 100]}
                 tickFormatter={formatTrendPercent}
+                width={38}
                 tick={{ fill: isLightTheme ? '#64748b' : '#71717a', fontSize: 11, fontWeight: 600 }}
               />
               <Tooltip
                 cursor={{ fill: 'rgba(255,255,255,0.04)' }}
-                formatter={(value) => formatTrendPercent(value as number | string)}
+                formatter={(value, name, item) => {
+                  const tooltipItem = item as { dataKey?: EntryType; payload?: Record<string, number> };
+                  const type = tooltipItem.dataKey;
+                  const rawValue = type ? tooltipItem.payload?.[trendRawKey(type)] : undefined;
+                  return [type && rawValue !== undefined ? formatAmount(type, rawValue) : formatTrendPercent(value as number | string), name];
+                }}
                 contentStyle={{
                   background: isLightTheme ? 'rgba(255,255,255,0.96)' : '#18181b',
                   border: isLightTheme ? '1px solid rgba(15,23,42,0.1)' : '1px solid rgba(255,255,255,0.1)',
@@ -1112,7 +1132,7 @@ function App() {
   const isLightTheme = theme === 'light';
 
   return (
-    <div className={`min-h-[100dvh] bg-black text-white ${isLightTheme ? 'theme-light' : 'theme-dark'}`}>
+    <div className={`min-h-[100dvh] text-white ${isLightTheme ? 'theme-light' : 'theme-dark'}`} style={{ backgroundColor: appBackground[theme] }}>
       <main className="mx-auto min-h-[100dvh] max-w-md bg-[radial-gradient(circle_at_50%_-10%,rgba(80,80,80,0.34),transparent_36%),#050505]">
         <AnimatePresence mode="wait">
           <motion.div

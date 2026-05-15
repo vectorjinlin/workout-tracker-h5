@@ -4,16 +4,18 @@
 
 :root {
   color-scheme: dark;
+  background: #050505;
 }
 
 :root[data-theme='light'] {
   color-scheme: light;
+  background: #f6f8fc;
 }
 
 html, body {
   min-height: 100%;
   font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background: #080d18;
+  background: #050505;
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
   user-select: none;
@@ -42,11 +44,11 @@ textarea {
 }
 
 :root[data-theme='light'] body {
-  background: #f3f6fb;
+  background: #f6f8fc;
 }
 
 .theme-light.bg-black {
-  background: #f3f6fb !important;
+  background: #f6f8fc !important;
 }
 
 .theme-light main {
