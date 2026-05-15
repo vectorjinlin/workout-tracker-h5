@@ -231,6 +231,10 @@ const formatAmount = (type: EntryType, amount: number) => {
 
 const formatUnit = (type: EntryType) => (exerciseMeta[type].kind === 'time' ? '分钟' : exerciseMeta[type].unit);
 
+const toTrendPercent = (value: number, best: number) => (best > 0 ? Math.round((value / best) * 100) : 0);
+
+const formatTrendPercent = (value: number | string) => `${Math.round(Number(value) || 0)}%`;
+
 const getAmountTextClass = (type: EntryType, amount: number) => {
   const text = formatAmount(type, amount);
   if (type === 'plank' || type === 'handstand') {
@@ -620,6 +624,18 @@ function App() {
     }, {});
   }, [entries]);
 
+  const trendBests = useMemo(() => {
+    return Object.values(dailySummaries).reduce<Record<EntryType, number>>(
+      (acc, daySummary) => {
+        order.forEach((type) => {
+          acc[type] = Math.max(acc[type], daySummary[type]);
+        });
+        return acc;
+      },
+      { pushups: 0, pullups: 0, plank: 0, handstand: 0 }
+    );
+  }, [dailySummaries]);
+
   const trainingDays = useMemo(() => Object.keys(dailySummaries).length, [dailySummaries]);
 
   const streakDays = useMemo(() => {
@@ -643,13 +659,13 @@ function App() {
       const daySummary = dailySummaries[key] ?? { pushups: 0, pullups: 0, plank: 0, handstand: 0 };
       return {
         date: `${date.getUTCMonth() + 1}/${date.getUTCDate()}`,
-        pushups: daySummary.pushups,
-        pullups: daySummary.pullups,
-        plank: Math.round(daySummary.plank / 60),
-        handstand: Math.round(daySummary.handstand / 60)
+        pushups: toTrendPercent(daySummary.pushups, trendBests.pushups),
+        pullups: toTrendPercent(daySummary.pullups, trendBests.pullups),
+        plank: toTrendPercent(daySummary.plank, trendBests.plank),
+        handstand: toTrendPercent(daySummary.handstand, trendBests.handstand)
       };
     });
-  }, [dailySummaries, trendRange]);
+  }, [dailySummaries, trendBests, trendRange]);
 
   const totalMinutes = Math.round((summary.plank + summary.handstand) / 60);
   const totalReps = summary.pushups + summary.pullups;
@@ -995,9 +1011,17 @@ function App() {
             <LineChart data={trendData} margin={{ top: 8, right: 6, left: -28, bottom: 0 }}>
               <CartesianGrid stroke={isLightTheme ? 'rgba(15,23,42,0.08)' : 'rgba(255,255,255,0.07)'} vertical={false} />
               <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: isLightTheme ? '#64748b' : '#71717a', fontSize: 11, fontWeight: 600 }} />
-              <YAxis axisLine={false} tickLine={false} tick={{ fill: isLightTheme ? '#64748b' : '#71717a', fontSize: 11, fontWeight: 600 }} />
+              <YAxis
+                axisLine={false}
+                tickLine={false}
+                domain={[0, 100]}
+                ticks={[0, 25, 50, 75, 100]}
+                tickFormatter={formatTrendPercent}
+                tick={{ fill: isLightTheme ? '#64748b' : '#71717a', fontSize: 11, fontWeight: 600 }}
+              />
               <Tooltip
                 cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                formatter={(value) => formatTrendPercent(value as number | string)}
                 contentStyle={{
                   background: isLightTheme ? 'rgba(255,255,255,0.96)' : '#18181b',
                   border: isLightTheme ? '1px solid rgba(15,23,42,0.1)' : '1px solid rgba(255,255,255,0.1)',
